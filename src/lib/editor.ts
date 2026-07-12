@@ -27,9 +27,13 @@ export type EditorAction =
   | { type: 'outdentTask'; id: string }
   | { type: 'moveTask'; id: string; direction: 'up' | 'down' }
   | { type: 'setInfoTitle'; title: string }
+  | { type: 'replaceSpec'; spec: TaskSpec }
 
 export function editorReducer(spec: TaskSpec, action: EditorAction): TaskSpec {
   switch (action.type) {
+    case 'replaceSpec':
+      // spec 全体を差し替える(新規作成・ファイル読み込み・localStorage 復元)
+      return action.spec
     case 'addTask':
       return addTask(spec, action)
     case 'removeTask':

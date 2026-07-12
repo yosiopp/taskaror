@@ -249,6 +249,19 @@ describe('editorReducer: 並び替え', () => {
   })
 })
 
+describe('editorReducer: replaceSpec', () => {
+  it('spec 全体を差し替える', () => {
+    const base = spec([{ id: 'a', title: 'A' }])
+    const next: TaskSpec = {
+      taskspec: '1.0',
+      info: { title: '新規' },
+      tasks: [{ id: 'b', title: 'B' }],
+    }
+    const result = editorReducer(base, { type: 'replaceSpec', spec: next })
+    expect(result).toBe(next)
+  })
+})
+
 describe('editorReducer: info', () => {
   it('プロジェクトタイトルを設定・削除する', () => {
     const base = spec([])
