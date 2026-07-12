@@ -15,13 +15,13 @@ taskaror は、YAML ベースのタスク定義フォーマット **TaskSpec** �
 npm run dev           # Vite dev server (HMR)
 npm run build         # tsc -b && vite build
 npm run typecheck     # tsc -b(型チェックのみ)
+npm run test          # Vitest(1 回実行)
+npm run test:watch    # Vitest(watch モード)
 npm run lint          # ESLint
 npm run lint:fix
 npm run format        # Prettier(セミコロンなし・シングルクォート)
 npm run format:check
 ```
-
-テストはまだ存在しない(test スクリプト未定義)。
 
 ### Docker
 

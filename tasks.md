@@ -6,8 +6,8 @@
 
 ## フェーズ 1: コア基盤(検証・テスト)
 
-- [ ] Vitest を導入する(`npm run test` を追加し、CLAUDE.md のコマンド一覧を更新する)
-- [ ] 既存コアロジック(parseTaskSpec / serializeTaskSpec / flattenTasks)のユニットテストを書く
+- [x] Vitest を導入する(`npm run test` を追加し、CLAUDE.md のコマンド一覧を更新する)
+- [x] 既存コアロジック(parseTaskSpec / serializeTaskSpec / flattenTasks)のユニットテストを書く
 - [ ] schema.json による完全バリデーションを実装する(`ajv/dist/2020` の Ajv2020 + ajv-formats)
   - [ ] Ajv のエラーを日本語メッセージ+ドキュメント上のパス付きに変換して返す
 - [ ] スキーマでは表現できない構造検証を実装する(将来 CLI の validator でそのまま再利用する)
