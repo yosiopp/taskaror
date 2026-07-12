@@ -17,6 +17,12 @@ export interface ToolbarProps {
   onSave: () => void
   /** ファイルを選択して読み込む */
   onOpenFile: (file: File) => void
+  /** 元に戻せるか(履歴あり) */
+  canUndo: boolean
+  /** やり直せるか(future あり) */
+  canRedo: boolean
+  onUndo: () => void
+  onRedo: () => void
   /** ＋ タスク(選択中なら兄弟の後ろ、未選択ならルート末尾) */
   onAdd: () => void
   /** ＋ 子タスク(選択中の子として追加) */
@@ -36,6 +42,10 @@ function Toolbar(props: ToolbarProps) {
     onNew,
     onSave,
     onOpenFile,
+    canUndo,
+    canRedo,
+    onUndo,
+    onRedo,
     onAdd,
     onAddChild,
     onRemove,
@@ -93,6 +103,27 @@ function Toolbar(props: ToolbarProps) {
           hidden
           onChange={handleFileChange}
         />
+      </div>
+      <span className="toolbar-sep" aria-hidden="true" />
+      <div className="toolbar-actions">
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={!canUndo}
+          aria-label="元に戻す"
+          title="元に戻す (Cmd/Ctrl+Z)"
+        >
+          ↶
+        </button>
+        <button
+          type="button"
+          onClick={onRedo}
+          disabled={!canRedo}
+          aria-label="やり直す"
+          title="やり直す (Cmd/Ctrl+Shift+Z)"
+        >
+          ↷
+        </button>
       </div>
       <span className="toolbar-sep" aria-hidden="true" />
       <div className="toolbar-actions">

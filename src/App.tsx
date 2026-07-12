@@ -15,7 +15,8 @@ import LoadErrorNotice from './components/LoadError'
 import type { LoadError } from './components/LoadError'
 import { DAY_WIDTH, ROW_HEIGHT } from './components/constants'
 import { editorReducer, newTask } from './lib/editor'
-import type { AddMode, TaskFields } from './lib/editor'
+import type { AddMode, EditorAction, TaskFields } from './lib/editor'
+import { canRedo, canUndo, initHistory, withHistory } from './lib/history'
 import { flattenTasks, parseTaskSpec, serializeTaskSpec } from './lib/taskspec'
 import { emptyTaskSpec, taskSpecFileName } from './lib/file'
 import { validateTaskSpec } from './lib/validate'
@@ -88,13 +89,45 @@ function hasEditContent(spec: TaskSpec): boolean {
   return spec.tasks.length > 0 || (spec.info?.title ?? '') !== ''
 }
 
+/**
+ * 連続した編集を 1 履歴にまとめる判定。
+ * setInfoTitle はキーストロークごとに action が飛ぶため、直前も setInfoTitle なら
+ * まとめて 1 回で undo できるようにする。replaceSpec(新規・読み込み・復元)は
+ * まとめ対象にせず、個別に undo できるようにする。
+ */
+function shouldCoalesceEdit(prev: EditorAction, next: EditorAction): boolean {
+  return prev.type === 'setInfoTitle' && next.type === 'setInfoTitle'
+}
+
+/** 履歴(undo / redo)対応にラップしたエディタ reducer */
+const historyReducer = withHistory(editorReducer, {
+  shouldCoalesce: shouldCoalesceEdit,
+})
+
+/**
+ * フォーカス中の要素が入力欄などの編集可能要素か。
+ * true の間はブラウザ既定の undo を優先し、アプリの undo ショートカットは動かさない。
+ */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  return (
+    tag === 'INPUT' ||
+    tag === 'TEXTAREA' ||
+    tag === 'SELECT' ||
+    target.isContentEditable
+  )
+}
+
 function App() {
   // localStorage に妥当な編集内容があればそれを、なければサンプルを初期状態にする
-  const [spec, dispatch] = useReducer(
-    editorReducer,
-    undefined,
-    () => loadStoredSpec() ?? parseTaskSpec(sampleSource),
+  const [history, dispatch] = useReducer(historyReducer, undefined, () =>
+    initHistory<TaskSpec, EditorAction>(
+      loadStoredSpec() ?? parseTaskSpec(sampleSource),
+    ),
   )
+  // present を従来の spec として扱う(編集・派生・保存はすべて present 基準)
+  const spec = history.present
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // ファイル読み込みの失敗内容(パース or 検証)。成功時・閉じたときは null
@@ -104,6 +137,25 @@ function App() {
   useEffect(() => {
     saveStoredSpec(spec)
   }, [spec])
+
+  // キーボードショートカット: Cmd/Ctrl+Z で undo、Cmd/Ctrl+Shift+Z・Ctrl+Y で redo。
+  // 入力欄など編集要素にフォーカスがある間はブラウザ既定の undo を邪魔しない。
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (!(event.metaKey || event.ctrlKey)) return
+      if (isEditableTarget(event.target)) return
+      const key = event.key.toLowerCase()
+      if (key === 'z' && !event.shiftKey) {
+        event.preventDefault()
+        dispatch({ type: 'undo' })
+      } else if ((key === 'z' && event.shiftKey) || key === 'y') {
+        event.preventDefault()
+        dispatch({ type: 'redo' })
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // 依存編集の選択肢に使う全タスク(深さ付き)
   const allTasks = useMemo(() => flattenTasks(spec.tasks), [spec])
@@ -315,6 +367,10 @@ function App() {
         onNew={handleNew}
         onSave={handleSave}
         onOpenFile={loadFromFile}
+        canUndo={canUndo(history)}
+        canRedo={canRedo(history)}
+        onUndo={() => dispatch({ type: 'undo' })}
+        onRedo={() => dispatch({ type: 'redo' })}
         onAdd={handleAdd}
         onAddChild={handleAddChild}
         onRemove={handleRemove}

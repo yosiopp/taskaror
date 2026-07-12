@@ -68,7 +68,7 @@
 
 ## フェーズ 6: UX改善
 
-- [ ] Undo / Redo
+- [x] Undo / Redo
 - [ ] バーのドラッグによる start・estimate の変更
 - [ ] 読み込んだ YAML の忠実性(コメント・キー順・引用符スタイルの保持。yaml の Document API を検討)
 - [ ] YAML テキストエディタビュー(CodeMirror 等。GUI との切り替え or 分割表示)
