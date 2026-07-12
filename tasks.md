@@ -88,7 +88,7 @@
 
 - [x] GitHub Actions で CI を構築する(typecheck / lint / format:check / test / build)
 - [x] LICENSE ファイルを追加する(Apache-2.0。README に記載済みだがファイルが未作成)
-- [ ] README に使い方・スクリーンショットを追加する
+- [x] README に使い方・スクリーンショットを追加する
 
 ## 将来フェーズ: CLI(粗い粒度)
 
