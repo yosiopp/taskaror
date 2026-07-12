@@ -1,0 +1,366 @@
+import { describe, expect, it } from 'vitest'
+import type { TaskSpec } from '../types/taskspec'
+import { computeGanttLayout, flattenScheduled, type GanttRow } from './gantt'
+import { scheduleTasks, type ScheduledTask } from './schedule'
+
+// 基準となる曜日(2026-07):
+//  13(月) 14(火) 15(水) 16(木) 17(金) 18(土) 19(日) 20(月) 21(火) 22(水)
+const TODAY = '2026-07-13'
+
+function spec(tasks: TaskSpec['tasks']): TaskSpec {
+  return { taskspec: '1.0', tasks }
+}
+
+function rowId(row: GanttRow): string {
+  return row.scheduled.task.id
+}
+
+/** テスト用に ScheduledTask を直接組み立てる(scheduleTasks を介さないケース用) */
+function scheduled(overrides: Partial<ScheduledTask>): ScheduledTask {
+  return {
+    task: { id: 'x', title: 'X' },
+    start: TODAY,
+    end: TODAY,
+    durationDays: 1,
+    isMilestone: false,
+    isSummary: false,
+    children: [],
+    ...overrides,
+  }
+}
+
+describe('flattenScheduled', () => {
+  it('ネストを深さ優先(親→子)で平坦化し depth / hasChildren を付与する', () => {
+    const roots = scheduleTasks(
+      spec([
+        {
+          id: 'p',
+          title: 'P',
+          tasks: [
+            { id: 'c1', title: 'C1', estimate: '1d' },
+            { id: 'c2', title: 'C2', estimate: '1d', depends: ['c1'] },
+          ],
+        },
+        { id: 'q', title: 'Q', estimate: '1d' },
+      ]),
+      { today: TODAY },
+    )
+    const rows = flattenScheduled(roots)
+
+    expect(rows.map(rowId)).toEqual(['p', 'c1', 'c2', 'q'])
+    expect(rows.map((r) => r.depth)).toEqual([0, 1, 1, 0])
+    expect(rows.map((r) => r.hasChildren)).toEqual([true, false, false, false])
+    expect(rows.every((r) => r.collapsed === false)).toBe(true)
+  })
+
+  it('collapsedIds に含まれる親は子孫を省き自身は collapsed=true で残す', () => {
+    const roots = scheduleTasks(
+      spec([
+        {
+          id: 'p',
+          title: 'P',
+          tasks: [{ id: 'c1', title: 'C1', estimate: '1d' }],
+        },
+        { id: 'q', title: 'Q', estimate: '1d' },
+      ]),
+      { today: TODAY },
+    )
+    const rows = flattenScheduled(roots, new Set(['p']))
+
+    expect(rows.map(rowId)).toEqual(['p', 'q'])
+    expect(rows[0].collapsed).toBe(true)
+    expect(rows[0].hasChildren).toBe(true)
+  })
+
+  it('子を持たない id を collapsedIds に入れても collapsed にはならない', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 'a', title: 'A', estimate: '1d' }]),
+      { today: TODAY },
+    )
+    const rows = flattenScheduled(roots, new Set(['a']))
+    expect(rows[0].collapsed).toBe(false)
+  })
+})
+
+describe('computeGanttLayout: 期間と軸', () => {
+  it('rangeStart / rangeEnd に paddingDays の余白を足し days を全暦日列挙する', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 'a', title: 'A', start: '2026-07-13', estimate: '1d' }]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+      paddingDays: 1,
+    })
+
+    // start=end=07-13 の前後 1 日 → 07-12 〜 07-14
+    expect(layout.rangeStart).toBe('2026-07-12')
+    expect(layout.rangeEnd).toBe('2026-07-14')
+    expect(layout.days.map((d) => d.date)).toEqual([
+      '2026-07-12',
+      '2026-07-13',
+      '2026-07-14',
+    ])
+    expect(layout.days.map((d) => d.x)).toEqual([0, 10, 20])
+    // 07-12 は日曜
+    expect(layout.days.map((d) => d.isWeekend)).toEqual([true, false, false])
+    expect(layout.width).toBe(30)
+    expect(layout.height).toBe(20)
+  })
+
+  it('months は YYYY-MM でグルーピングし幅を日数 * dayWidth にする', () => {
+    // 07-31(金)開始 1d を置くと余白込みで 07-30 〜 08-01 が範囲になり月をまたぐ
+    const roots = scheduleTasks(
+      spec([{ id: 'a', title: 'A', start: '2026-07-31', estimate: '1d' }]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+      paddingDays: 1,
+    })
+    // 範囲: 07-30, 07-31, 08-01
+    expect(layout.months).toEqual([
+      { label: '2026-07', x: 0, width: 20 },
+      { label: '2026-08', x: 20, width: 10 },
+    ])
+  })
+})
+
+describe('computeGanttLayout: バー / マイルストーン', () => {
+  it('タスクバーの X と幅は開始・終了日を含む(dayIndex 変換)', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 'a', title: 'A', start: '2026-07-13', estimate: '3d' }]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+      paddingDays: 1,
+    })
+    // rangeStart=07-12。07-13 は dayIndex=1、07-15 は dayIndex=3
+    const bar = layout.rows[0]
+    expect(bar.kind).toBe('task')
+    expect(bar.x).toBe(10)
+    // 07-13〜07-15 の 3 暦日ぶん
+    expect(bar.width).toBe(30)
+    expect(bar.y).toBe(0)
+    expect(bar.cy).toBe(10)
+  })
+
+  it('barHeight 既定は rowHeight*0.5、barY は上下中央寄せ', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 'a', title: 'A', start: '2026-07-13', estimate: '1d' }]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+    })
+    const bar = layout.rows[0]
+    expect(bar.barHeight).toBe(10)
+    expect(bar.barY).toBe(5) // (20 - 10) / 2
+  })
+
+  it('マイルストーンは width=0 で cx が開始カラム中央', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 'm', title: 'M', start: '2026-07-13' }]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+      paddingDays: 1,
+    })
+    const ms = layout.rows[0]
+    expect(ms.kind).toBe('milestone')
+    expect(ms.width).toBe(0)
+    // rangeStart=07-12 → 07-13 は dayIndex=1 → cx = (1 + 0.5) * 10 = 15
+    expect(ms.cx).toBe(15)
+    expect(ms.progressWidth).toBe(0)
+  })
+
+  it('サマリー(親)は kind=summary で progressWidth=0', () => {
+    const roots = scheduleTasks(
+      spec([
+        {
+          id: 'p',
+          title: 'P',
+          progress: 50,
+          tasks: [{ id: 'c', title: 'C', estimate: '1d' }],
+        },
+      ]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+    })
+    const summary = layout.rows.find((r) => r.id === 'p')!
+    expect(summary.kind).toBe('summary')
+    expect(summary.progressWidth).toBe(0)
+  })
+})
+
+describe('computeGanttLayout: 進捗オーバーレイ', () => {
+  it('task の progressWidth = width * progress/100', () => {
+    const rows = flattenScheduled([
+      scheduled({
+        task: { id: 'a', title: 'A', progress: 40 },
+        start: '2026-07-13',
+        end: '2026-07-13',
+      }),
+    ])
+    const layout = computeGanttLayout(rows, {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+      paddingDays: 0,
+    })
+    const bar = layout.rows[0]
+    expect(bar.width).toBe(10)
+    expect(bar.progressWidth).toBeCloseTo(4)
+  })
+
+  it('progress は 0〜100 にクランプする', () => {
+    const rows = flattenScheduled([
+      scheduled({
+        task: { id: 'a', title: 'A', progress: 150 },
+        start: '2026-07-13',
+        end: '2026-07-13',
+      }),
+    ])
+    const layout = computeGanttLayout(rows, {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+      paddingDays: 0,
+    })
+    expect(layout.rows[0].progressWidth).toBe(10)
+  })
+})
+
+describe('computeGanttLayout: 今日線', () => {
+  it('range 内なら todayX を暦日 X で返す', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 'a', title: 'A', start: '2026-07-13', estimate: '1d' }]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: '2026-07-13',
+      paddingDays: 1,
+    })
+    // rangeStart=07-12 → 07-13 は dayIndex=1 → X=10
+    expect(layout.todayX).toBe(10)
+  })
+
+  it('range 外なら null', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 'a', title: 'A', start: '2026-07-13', estimate: '1d' }]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: '2026-08-01',
+      paddingDays: 1,
+    })
+    expect(layout.todayX).toBeNull()
+  })
+})
+
+describe('computeGanttLayout: 依存矢印', () => {
+  it('可視行どうしの依存にだけ finish-to-start の折れ線を作る', () => {
+    const roots = scheduleTasks(
+      spec([
+        { id: 'a', title: 'A', start: '2026-07-13', estimate: '1d' },
+        { id: 'b', title: 'B', estimate: '1d', depends: ['a'] },
+      ]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+      paddingDays: 1,
+    })
+
+    expect(layout.arrows).toHaveLength(1)
+    const arrow = layout.arrows[0]
+    expect(arrow.fromId).toBe('a')
+    expect(arrow.toId).toBe('b')
+    const a = layout.rows.find((r) => r.id === 'a')!
+    const b = layout.rows.find((r) => r.id === 'b')!
+    // 始点は先行バー右端、終点は後続バー左端
+    expect(arrow.points[0]).toEqual({ x: a.x + a.width, y: a.cy })
+    expect(arrow.points[arrow.points.length - 1]).toEqual({ x: b.x, y: b.cy })
+  })
+
+  it('先行が折りたたみで非表示なら矢印を作らない', () => {
+    const roots = scheduleTasks(
+      spec([
+        {
+          id: 'p',
+          title: 'P',
+          tasks: [{ id: 'a', title: 'A', estimate: '1d' }],
+        },
+        { id: 'b', title: 'B', estimate: '1d', depends: ['a'] },
+      ]),
+      { today: TODAY },
+    )
+    // p を畳むと子 a は非表示 → a への依存は矢印にしない
+    const rows = flattenScheduled(roots, new Set(['p']))
+    const layout = computeGanttLayout(rows, {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+    })
+    expect(layout.arrows).toHaveLength(0)
+  })
+
+  it('先行がマイルストーンなら端点に cx を使う', () => {
+    const roots = scheduleTasks(
+      spec([
+        { id: 'm', title: 'M', start: '2026-07-13' },
+        { id: 'n', title: 'N', estimate: '1d', depends: ['m'] },
+      ]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+    })
+    const m = layout.rows.find((r) => r.id === 'm')!
+    const arrow = layout.arrows[0]
+    expect(arrow.points[0].x).toBe(m.cx)
+  })
+})
+
+describe('computeGanttLayout: 空入力', () => {
+  it('visibleRows が空ならすべて空 / 0 の妥当な GanttLayout を返す', () => {
+    const layout = computeGanttLayout([], { dayWidth: 10, rowHeight: 20 })
+    expect(layout).toMatchObject({
+      width: 0,
+      height: 0,
+      dayWidth: 10,
+      rowHeight: 20,
+      rangeStart: '',
+      rangeEnd: '',
+      days: [],
+      months: [],
+      rows: [],
+      arrows: [],
+      todayX: null,
+    })
+  })
+})

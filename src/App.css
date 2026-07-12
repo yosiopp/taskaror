@@ -1,38 +1,431 @@
+/* ガントエディタ全体のスタイル(素の CSS。フレームワーク不使用)。
+   行の高さ(ROW_HEIGHT)・ヘッダ高(HEADER_HEIGHT)は
+   src/components/constants.ts と一致させ、左右ペインの行を揃える。 */
+
+:root {
+  --accent: #2563eb;
+  --surface: #ffffff;
+  --surface-alt: #f6f8fa;
+  --row-selected: rgba(37, 99, 235, 0.12);
+  --row-hover: rgba(0, 0, 0, 0.03);
+
+  --gantt-weekend: rgba(0, 0, 0, 0.045);
+  --gantt-rowline: rgba(0, 0, 0, 0.06);
+  --gantt-today: #e5534b;
+  --gantt-header-line: var(--border);
+
+  --bar-task: #6ca8ff;
+  --bar-progress: #2563eb;
+  --bar-summary: #57606a;
+  --milestone: #8250df;
+  --arrow: #8d96a0;
+  --bar-stroke-selected: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #0d1117;
+    --surface-alt: #161b22;
+    --row-selected: rgba(56, 139, 253, 0.18);
+    --row-hover: rgba(255, 255, 255, 0.04);
+
+    --gantt-weekend: rgba(255, 255, 255, 0.05);
+    --gantt-rowline: rgba(255, 255, 255, 0.07);
+    --gantt-today: #ff6b64;
+
+    --bar-task: #316dca;
+    --bar-progress: #79c0ff;
+    --bar-summary: #768390;
+    --milestone: #a371f7;
+    --arrow: #768390;
+    --bar-stroke-selected: #e6edf3;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
 .app {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.app-header h1 {
-  margin: 0;
-  font-size: 1.75rem;
+/* --- ツールバー --- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+  flex-wrap: wrap;
 }
 
-.app-header p {
-  margin: 0.25rem 0 0;
+.toolbar-brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-right: 0.25rem;
+}
+
+.toolbar-title {
+  flex: 0 1 240px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.9375rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.toolbar button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.toolbar button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toolbar button.danger:hover:not(:disabled) {
+  border-color: var(--gantt-today);
+  color: var(--gantt-today);
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 1.25rem;
+  background: var(--border);
+  margin: 0 0.15rem;
+}
+
+/* --- エラーバナー --- */
+.app-error {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #fff;
+  background: var(--gantt-today);
+}
+
+/* --- 本文(左グリッド + 右ガント) --- */
+.app-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* --- 左タスクグリッド --- */
+.grid-pane {
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.grid-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  align-items: center;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.grid-th {
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid-row {
+  display: grid;
+  align-items: stretch;
+  border-bottom: 1px solid var(--gantt-rowline);
+  cursor: default;
+}
+
+.grid-row:hover {
+  background: var(--row-hover);
+}
+
+.grid-row.selected {
+  background: var(--row-selected);
+}
+
+.grid-cell {
+  display: flex;
+  align-items: center;
+  padding: 0 0.4rem;
+  min-width: 0;
+  font-size: 0.8125rem;
+  border-left: 1px solid var(--gantt-rowline);
+}
+
+.grid-cell:first-child {
+  border-left: none;
+}
+
+.grid-cell.editable {
+  cursor: text;
+}
+
+.cell-name {
+  gap: 0.15rem;
+}
+
+.cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-text.title {
+  cursor: text;
+  flex: 1;
+  min-width: 0;
+}
+
+.cell-text.muted {
   color: var(--text-muted);
 }
 
-.hint {
+.cell-placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.collapse-toggle {
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  font-size: 0.6rem;
+  line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.collapse-spacer {
+  display: inline-block;
+  width: 1.15rem;
+  flex: 0 0 auto;
+}
+
+.grid-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+}
+
+/* --- 依存エディタ --- */
+.depends-cell {
+  position: relative;
+  padding: 0;
+}
+
+.depends-button {
+  width: 100%;
+  height: 100%;
+  padding: 0 0.4rem;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.depends-popover {
+  position: fixed;
+  z-index: 100;
+  width: 240px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+
+.depends-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.depends-list label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.35rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.depends-list label:hover {
+  background: var(--row-hover);
+}
+
+.depends-id {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.depends-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.depends-empty {
+  margin: 0;
+  padding: 0.35rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* --- 右ガントチャート --- */
+.gantt-pane {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: var(--surface);
+}
+
+.gantt-inner {
+  position: relative;
+}
+
+.gantt-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.gantt-empty {
+  padding: 1rem;
   color: var(--text-muted);
   font-size: 0.875rem;
 }
 
-.task-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9375rem;
+.gantt-body {
+  display: block;
 }
 
-.task-table th,
-.task-table td {
-  padding: 0.5rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
+/* SVG 要素(テーマ変数で塗り分けてダークモードに追従) */
+.gantt-weekend {
+  fill: var(--gantt-weekend);
 }
 
-.task-table th {
-  color: var(--text-muted);
+.gantt-rowline {
+  stroke: var(--gantt-rowline);
+  stroke-width: 1;
+}
+
+.gantt-header-line {
+  stroke: var(--gantt-header-line);
+  stroke-width: 1;
+}
+
+.gantt-month-label {
+  fill: var(--text-muted);
+  font-size: 11px;
   font-weight: 600;
+}
+
+.gantt-day-label {
+  fill: var(--text-muted);
+  font-size: 10px;
+}
+
+.gantt-day-label.weekend {
+  opacity: 0.6;
+}
+
+.gantt-today {
+  stroke: var(--gantt-today);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
+.gantt-bar-group {
+  cursor: pointer;
+}
+
+.gantt-bar {
+  fill: var(--bar-task);
+  cursor: pointer;
+}
+
+.gantt-progress {
+  fill: var(--bar-progress);
+  pointer-events: none;
+}
+
+.gantt-summary {
+  fill: var(--bar-summary);
+  cursor: pointer;
+}
+
+.gantt-milestone {
+  fill: var(--milestone);
+  cursor: pointer;
+}
+
+.gantt-bar.selected,
+.gantt-summary.selected,
+.gantt-milestone.selected {
+  stroke: var(--bar-stroke-selected);
+  stroke-width: 1.5;
+}
+
+.gantt-arrow {
+  fill: none;
+  stroke: var(--arrow);
+  stroke-width: 1.25;
+}
+
+.gantt-arrowhead {
+  fill: var(--arrow);
 }
