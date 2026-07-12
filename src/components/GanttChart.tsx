@@ -21,6 +21,10 @@ export interface GanttChartProps {
   layout: GanttLayout
   /** 選択中タスク id(該当バーを強調) */
   selectedId: string | null
+  /** クリティカルパス上のタスク id 集合(該当バー・矢印を強調) */
+  criticalIds: ReadonlySet<string>
+  /** クリティカルパスの強調表示が ON か */
+  showCritical: boolean
   /** バークリック・キーボードでの行選択に連動 */
   onSelectBar: (id: string) => void
   /** バードラッグ・キーボードでの start / estimate 変更を反映する */
@@ -30,8 +34,18 @@ export interface GanttChartProps {
 const DAY_BAND_HEIGHT = HEADER_HEIGHT - MONTH_BAND_HEIGHT
 
 function GanttChart(props: GanttChartProps) {
-  const { layout, selectedId, onSelectBar, onUpdateTask } = props
+  const {
+    layout,
+    selectedId,
+    criticalIds,
+    showCritical,
+    onSelectBar,
+    onUpdateTask,
+  } = props
   const { width, height, dayWidth } = layout
+  // クリティカル判定は表示 ON のときだけ有効にする
+  const isCritical = (id: string): boolean =>
+    showCritical && criticalIds.has(id)
 
   if (layout.days.length === 0) {
     return (
@@ -120,6 +134,17 @@ function GanttChart(props: GanttChartProps) {
             >
               <path className="gantt-arrowhead" d="M0,0 L6,3 L0,6 Z" />
             </marker>
+            <marker
+              id="gantt-arrowhead-critical"
+              markerWidth="7"
+              markerHeight="7"
+              refX="6"
+              refY="3"
+              orient="auto"
+              markerUnits="userSpaceOnUse"
+            >
+              <path className="gantt-arrowhead-critical" d="M0,0 L6,3 L0,6 Z" />
+            </marker>
           </defs>
 
           {/* 週末列のシェード */}
@@ -159,15 +184,22 @@ function GanttChart(props: GanttChartProps) {
             />
           ) : null}
 
-          {/* 依存矢印 */}
-          {layout.arrows.map((arrow) => (
-            <polyline
-              key={`a-${arrow.fromId}-${arrow.toId}`}
-              className="gantt-arrow"
-              points={arrow.points.map((p) => `${p.x},${p.y}`).join(' ')}
-              markerEnd="url(#gantt-arrowhead)"
-            />
-          ))}
+          {/* 依存矢印(両端がクリティカルなら強調) */}
+          {layout.arrows.map((arrow) => {
+            const critical = isCritical(arrow.fromId) && isCritical(arrow.toId)
+            return (
+              <polyline
+                key={`a-${arrow.fromId}-${arrow.toId}`}
+                className={critical ? 'gantt-arrow critical' : 'gantt-arrow'}
+                points={arrow.points.map((p) => `${p.x},${p.y}`).join(' ')}
+                markerEnd={
+                  critical
+                    ? 'url(#gantt-arrowhead-critical)'
+                    : 'url(#gantt-arrowhead)'
+                }
+              />
+            )
+          })}
 
           {/* バー / サマリー / マイルストーン */}
           {layout.rows.map((row) => (
@@ -175,6 +207,7 @@ function GanttChart(props: GanttChartProps) {
               key={row.id}
               row={row}
               selected={row.id === selectedId}
+              critical={isCritical(row.id)}
               dayWidth={dayWidth}
               onSelect={onSelectBar}
               onUpdateTask={onUpdateTask}
@@ -189,6 +222,8 @@ function GanttChart(props: GanttChartProps) {
 interface BarProps {
   row: GanttRowLayout
   selected: boolean
+  /** クリティカルパス上のバーか(強調クラスを付ける) */
+  critical: boolean
   /** 1 暦日あたりの px 幅(px 移動量 → 日数スナップに使う) */
   dayWidth: number
   onSelect: (id: string) => void
@@ -208,7 +243,14 @@ const RESIZE_HANDLE = 8
  * task / milestone はポインタドラッグとキーボードで start / estimate を編集でき、
  * すべての kind はフォーカス可能で Enter/Space による選択・↑↓ でのフォーカス移動に対応する。
  */
-function Bar({ row, selected, dayWidth, onSelect, onUpdateTask }: BarProps) {
+function Bar({
+  row,
+  selected,
+  critical,
+  dayWidth,
+  onSelect,
+  onUpdateTask,
+}: BarProps) {
   // ドラッグ中のプレビュー(確定は pointerup)。null なら非ドラッグ
   const [drag, setDrag] = useState<{
     mode: DragMode
@@ -316,7 +358,9 @@ function Bar({ row, selected, dayWidth, onSelect, onUpdateTask }: BarProps) {
   const cx = isMove ? row.cx + shift : row.cx
   const barWidth = isResize ? Math.max(dayWidth, row.width + shift) : row.width
   const progressWidth = Math.min(row.progressWidth, barWidth)
-  const selectedClass = selected ? ' selected' : ''
+  // 選択とクリティカルは両立する(.critical は CSS で .selected の後に定義して強調を優先)
+  const stateClass =
+    (selected ? ' selected' : '') + (critical ? ' critical' : '')
   const ariaLabel = barAriaLabel(row)
 
   const pointerHandlers = draggable
@@ -337,7 +381,7 @@ function Bar({ row, selected, dayWidth, onSelect, onUpdateTask }: BarProps) {
     ].join(' ')
     return (
       <polygon
-        className={`gantt-milestone${selectedClass}`}
+        className={`gantt-milestone${stateClass}`}
         points={points}
         role="button"
         tabIndex={0}
@@ -355,7 +399,7 @@ function Bar({ row, selected, dayWidth, onSelect, onUpdateTask }: BarProps) {
     const summaryY = row.cy - summaryHeight / 2
     return (
       <rect
-        className={`gantt-summary${selectedClass}`}
+        className={`gantt-summary${stateClass}`}
         x={row.x}
         y={summaryY}
         width={row.width}
@@ -375,7 +419,7 @@ function Bar({ row, selected, dayWidth, onSelect, onUpdateTask }: BarProps) {
   return (
     <g className="gantt-bar-group">
       <rect
-        className={`gantt-bar${selectedClass}`}
+        className={`gantt-bar${stateClass}`}
         x={x}
         y={row.barY}
         width={barWidth}

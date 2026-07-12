@@ -24,6 +24,10 @@ export interface ToolbarProps {
   viewMode: ViewMode
   /** ビューモードの切り替え */
   onViewModeChange: (mode: ViewMode) => void
+  /** クリティカルパスの強調表示が ON か */
+  showCriticalPath: boolean
+  /** クリティカルパス表示の ON/OFF を切り替える */
+  onToggleCriticalPath: () => void
   onTitleChange: (title: string) => void
   /** 新規作成(空の TaskSpec から始める) */
   onNew: () => void
@@ -54,6 +58,8 @@ function Toolbar(props: ToolbarProps) {
     selectedId,
     viewMode,
     onViewModeChange,
+    showCriticalPath,
+    onToggleCriticalPath,
     onTitleChange,
     onNew,
     onSave,
@@ -160,6 +166,18 @@ function Toolbar(props: ToolbarProps) {
       {/* タスク編集操作はガント編集ビューの選択タスクに作用するため、そのビューでのみ表示する */}
       {viewMode === 'gantt' ? (
         <>
+          <span className="toolbar-sep" aria-hidden="true" />
+          <div className="toolbar-actions">
+            <button
+              type="button"
+              className="critical-toggle"
+              aria-pressed={showCriticalPath}
+              onClick={onToggleCriticalPath}
+              title="クリティカルパス(余裕 0 のタスク鎖)を強調表示する"
+            >
+              クリティカルパス
+            </button>
+          </div>
           <span className="toolbar-sep" aria-hidden="true" />
           <div className="toolbar-actions">
             <button type="button" onClick={onAdd}>

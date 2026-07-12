@@ -38,6 +38,8 @@ import { scheduleTasks } from './lib/schedule'
 import type { ScheduledTask } from './lib/schedule'
 import { computeGanttLayout, flattenScheduled } from './lib/gantt'
 import type { GanttLayout, GanttRow } from './lib/gantt'
+import { computeCriticalPath } from './lib/critical'
+import { formatDate, today as localToday } from './lib/date'
 import type { TaskSpec } from './types/taskspec'
 
 interface Derived {
@@ -146,6 +148,36 @@ function saveStoredGridWidth(width: number): void {
   }
 }
 
+/** クリティカルパス表示の保存キー */
+const CRITICAL_PATH_KEY = 'taskaror:criticalPath'
+
+/** クリティカルパス表示の ON/OFF を復元する(未保存・不正なら OFF) */
+function loadShowCriticalPath(): boolean {
+  if (typeof localStorage === 'undefined') return false
+  try {
+    return localStorage.getItem(CRITICAL_PATH_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** クリティカルパス表示の ON/OFF を保存する(ブラウザ専用。失敗しても無視する) */
+function saveShowCriticalPath(on: boolean): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(CRITICAL_PATH_KEY, on ? '1' : '0')
+  } catch {
+    // 容量超過やプライベートモードでの失敗は無視する
+  }
+}
+
+/** 次のローカル深夜(0 時)までのミリ秒。日跨ぎで「今日」を更新するタイマーに使う */
+function msUntilNextLocalMidnight(): number {
+  const now = new Date()
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  return next.getTime() - now.getTime()
+}
+
 /** テキストをファイルとしてダウンロードさせる(ブラウザ専用) */
 function downloadText(text: string, fileName: string): void {
   const blob = new Blob([text], { type: 'text/yaml;charset=utf-8' })
@@ -209,6 +241,11 @@ function App() {
   const [loadError, setLoadError] = useState<LoadError | null>(null)
   // 本文のビューモード(ガント編集 / YAML / WBS 表)
   const [viewMode, setViewMode] = useState<ViewMode>(loadViewMode)
+  // クリティカルパスの強調表示 ON/OFF(ガントのバー・矢印に反映)
+  const [showCriticalPath, setShowCriticalPath] =
+    useState<boolean>(loadShowCriticalPath)
+  // 「今日」('YYYY-MM-DD')。今日線・スケジュールの基準日。日付をまたぐと更新する
+  const [today, setToday] = useState<string>(() => formatDate(localToday()))
 
   // spec が変わるたびに localStorage へ保存する(リロードでの作業消失を防ぐ)
   useEffect(() => {
@@ -219,6 +256,43 @@ function App() {
   useEffect(() => {
     saveViewMode(viewMode)
   }, [viewMode])
+
+  // クリティカルパス表示の ON/OFF を localStorage に保存する
+  useEffect(() => {
+    saveShowCriticalPath(showCriticalPath)
+  }, [showCriticalPath])
+
+  // 日付をまたいだら「今日」を更新し、今日線・スケジュールを追従させる。
+  // 次のローカル深夜に setTimeout を張り、発火したら today を更新して次の深夜を張り直す。
+  // スリープ復帰やタブ復帰でタイマーがずれることがあるため、focus / visibilitychange でも
+  // 今日を再評価する。setToday は関数更新なので、依存配列を空にしても値は陳腐化しない。
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const sync = (): void => {
+      setToday((prev) => {
+        const now = formatDate(localToday())
+        return prev === now ? prev : now
+      })
+    }
+    const scheduleNext = (): void => {
+      // 深夜を確実に跨ぐよう少し余裕を足す
+      timer = setTimeout(() => {
+        sync()
+        scheduleNext()
+      }, msUntilNextLocalMidnight() + 1000)
+    }
+    scheduleNext()
+    const handleVisibility = (): void => {
+      if (document.visibilityState === 'visible') sync()
+    }
+    window.addEventListener('focus', sync)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      if (timer !== undefined) clearTimeout(timer)
+      window.removeEventListener('focus', sync)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [])
 
   // キーボードショートカット: Cmd/Ctrl+Z で undo、Cmd/Ctrl+Shift+Z・Ctrl+Y で redo。
   // 入力欄など編集要素にフォーカスがある間はブラウザ既定の undo を邪魔しない。
@@ -248,18 +322,19 @@ function App() {
     { ok: true; derived: Derived } | { ok: false; error: string }
   >(() => {
     try {
-      const scheduled = scheduleTasks(spec)
+      const scheduled = scheduleTasks(spec, { today })
       const rows = flattenScheduled(scheduled, collapsedIds)
       const layout = computeGanttLayout(rows, {
         dayWidth: DAY_WIDTH,
         rowHeight: ROW_HEIGHT,
+        today,
       })
       return { ok: true, derived: { visibleRows: rows, layout, scheduled } }
     } catch (thrown) {
       const message = thrown instanceof Error ? thrown.message : String(thrown)
       return { ok: false, error: message }
     }
-  }, [spec, collapsedIds])
+  }, [spec, collapsedIds, today])
 
   // 直近の正常な派生結果を保持し、計算失敗時はこれを表示し続ける(アプリを落とさない)。
   // 正常に計算できたらレンダー中に取り込む(収束するので追加のレンダーは 1 回のみ)。
@@ -275,6 +350,13 @@ function App() {
   const derived = computation.ok ? computation.derived : lastGood
   const { visibleRows, layout } = derived
   const error = computation.ok ? null : computation.error
+
+  // クリティカルパス(slack 0 のタスク鎖)の id 集合。スケジュール導出結果から算出する。
+  // scheduled は spec / today が変わると作り直されるので、その参照変化で再計算される。
+  const criticalIds = useMemo(
+    () => computeCriticalPath(derived.scheduled),
+    [derived.scheduled],
+  )
 
   // --- ペイン幅(左グリッド)のドラッグリサイズ ---
   // 縦スクロールは 1 つの共有コンテナ(.editor-scroll)に集約したので、
@@ -459,6 +541,8 @@ function App() {
         selectedId={selectedId}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        showCriticalPath={showCriticalPath}
+        onToggleCriticalPath={() => setShowCriticalPath((on) => !on)}
         onTitleChange={(title) => dispatch({ type: 'setInfoTitle', title })}
         onNew={handleNew}
         onSave={handleSave}
@@ -504,6 +588,8 @@ function App() {
             <GanttChart
               layout={layout}
               selectedId={selectedId}
+              criticalIds={criticalIds}
+              showCritical={showCriticalPath}
               onSelectBar={setSelectedId}
               onUpdateTask={handleUpdate}
             />

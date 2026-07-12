@@ -20,6 +20,8 @@
   --milestone: #8250df;
   --arrow: #8d96a0;
   --bar-stroke-selected: var(--text);
+  /* クリティカルパスの強調(赤系アクセント) */
+  --critical: #d1242f;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,6 +41,7 @@
     --milestone: #a371f7;
     --arrow: #768390;
     --bar-stroke-selected: #e6edf3;
+    --critical: #ff7b72;
   }
 }
 
@@ -109,6 +112,18 @@
 .toolbar button.danger:hover:not(:disabled) {
   border-color: var(--gantt-today);
   color: var(--gantt-today);
+}
+
+/* クリティカルパス表示トグル。ON のときは赤系で押下状態を示す */
+.toolbar button.critical-toggle[aria-pressed='true'] {
+  color: #fff;
+  background: var(--critical);
+  border-color: var(--critical);
+}
+
+.toolbar button.critical-toggle[aria-pressed='true']:hover {
+  border-color: var(--critical);
+  filter: brightness(1.05);
 }
 
 .toolbar-sep {
@@ -642,6 +657,14 @@ body.is-resizing-cols {
   stroke-width: 1.5;
 }
 
+/* クリティカルパス上のバー。選択(.selected)より後に定義し、両立時は赤枠を優先する */
+.gantt-bar.critical,
+.gantt-summary.critical,
+.gantt-milestone.critical {
+  stroke: var(--critical);
+  stroke-width: 2;
+}
+
 /* キーボードフォーカスの可視化(選択の強調 .selected と両立させる) */
 .gantt-bar:focus,
 .gantt-summary:focus,
@@ -676,8 +699,17 @@ body.is-gantt-resizing * {
   stroke-width: 1.25;
 }
 
+.gantt-arrow.critical {
+  stroke: var(--critical);
+  stroke-width: 2;
+}
+
 .gantt-arrowhead {
   fill: var(--arrow);
+}
+
+.gantt-arrowhead-critical {
+  fill: var(--critical);
 }
 
 /* --- YAML テキストエディタビュー --- */
