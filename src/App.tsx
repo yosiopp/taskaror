@@ -443,6 +443,7 @@ function App() {
             layout={layout}
             selectedId={selectedId}
             onSelectBar={setSelectedId}
+            onUpdateTask={handleUpdate}
           />
         </div>
         <PaneSeparator

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskSpec } from '../types/taskspec'
-import { computeGanttLayout, flattenScheduled, type GanttRow } from './gantt'
+import {
+  computeGanttLayout,
+  estimateFromRange,
+  flattenScheduled,
+  pxToDayDelta,
+  shiftDateByBusinessDays,
+  shiftDateByDays,
+  type GanttRow,
+} from './gantt'
 import { scheduleTasks, type ScheduledTask } from './schedule'
 
 // 基準となる曜日(2026-07):
@@ -150,6 +158,23 @@ describe('computeGanttLayout: バー / マイルストーン', () => {
     expect(bar.width).toBe(30)
     expect(bar.y).toBe(0)
     expect(bar.cy).toBe(10)
+  })
+
+  it('行に title / start / end を保持する(アクセシビリティ・ドラッグ用)', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 'a', title: '設計', start: '2026-07-13', estimate: '3d' }]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+    })
+    const bar = layout.rows[0]
+    expect(bar.title).toBe('設計')
+    expect(bar.start).toBe('2026-07-13')
+    // 月から 3 営業日 -> 水曜 07-15
+    expect(bar.end).toBe('2026-07-15')
   })
 
   it('barHeight 既定は rowHeight*0.5、barY は上下中央寄せ', () => {
@@ -362,5 +387,49 @@ describe('computeGanttLayout: 空入力', () => {
       arrows: [],
       todayX: null,
     })
+  })
+})
+
+describe('pxToDayDelta', () => {
+  it('px 移動量を dayWidth で割って四捨五入する', () => {
+    expect(pxToDayDelta(0, 28)).toBe(0)
+    expect(pxToDayDelta(28, 28)).toBe(1)
+    expect(pxToDayDelta(41, 28)).toBe(1) // 1.46 -> 1
+    expect(pxToDayDelta(42, 28)).toBe(2) // 1.5 -> 2
+    expect(pxToDayDelta(-28, 28)).toBe(-1)
+    expect(pxToDayDelta(-56, 28)).toBe(-2)
+  })
+})
+
+describe('shiftDateByDays', () => {
+  it('暦日で前後にずらす(土日も 1 日として数える)', () => {
+    // 金 +1 暦日 -> 土
+    expect(shiftDateByDays('2026-07-17', 1)).toBe('2026-07-18')
+    expect(shiftDateByDays('2026-07-13', -1)).toBe('2026-07-12')
+    expect(shiftDateByDays('2026-07-13', 0)).toBe('2026-07-13')
+  })
+})
+
+describe('shiftDateByBusinessDays', () => {
+  it('営業日で前後にずらす(土日を飛ばす)', () => {
+    // 金 +1 営業日 -> 翌月曜
+    expect(shiftDateByBusinessDays('2026-07-17', 1)).toBe('2026-07-20')
+    // 月 -1 営業日 -> 前週金曜
+    expect(shiftDateByBusinessDays('2026-07-13', -1)).toBe('2026-07-10')
+  })
+})
+
+describe('estimateFromRange', () => {
+  it('開始〜終了の営業日数(両端含む)を日単位 estimate にする', () => {
+    // 月〜金 = 5 営業日
+    expect(estimateFromRange('2026-07-13', '2026-07-17')).toBe('5d')
+    // 単日 = 1d
+    expect(estimateFromRange('2026-07-13', '2026-07-13')).toBe('1d')
+    // 終了が土日に落ちても営業日だけ数える(月〜土 = 月火水木金 の 5 営業日)
+    expect(estimateFromRange('2026-07-13', '2026-07-18')).toBe('5d')
+  })
+
+  it('終了が開始より前でも最小 1 営業日にクランプする', () => {
+    expect(estimateFromRange('2026-07-13', '2026-07-10')).toBe('1d')
   })
 })

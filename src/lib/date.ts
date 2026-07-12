@@ -69,6 +69,21 @@ export function addBusinessDays(date: Date, n: number): Date {
 }
 
 /**
+ * 営業日を n 日ずらす(n は負数も可)。土日はまたいで数える。
+ * 起点が営業日であることを前提とする。shiftBusinessDays(d, 0) === d。
+ */
+export function shiftBusinessDays(date: Date, n: number): Date {
+  let result = date
+  let remaining = Math.abs(n)
+  const step = n < 0 ? -1 : 1
+  while (remaining > 0) {
+    result = addDays(result, step)
+    if (!isWeekend(result)) remaining -= 1
+  }
+  return result
+}
+
+/**
  * 営業日 days 日ぶんの期間の終了日を返す。
  * 開始日は営業日であることを前提とする。days <= 0(マイルストーン)は終了日 = 開始日。
  */

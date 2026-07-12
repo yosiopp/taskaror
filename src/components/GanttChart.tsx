@@ -5,21 +5,32 @@
  * 時間軸ヘッダは sticky top。縦横スクロールは App の共有スクロール容器が受け持つ
  * ので、このコンポーネント自体はスクロールコンテナを持たない(左右の行ずれ防止)。
  */
+import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent, PointerEvent } from 'react'
 import type { GanttLayout, GanttRowLayout } from '../lib/gantt'
+import {
+  estimateFromRange,
+  pxToDayDelta,
+  shiftDateByBusinessDays,
+  shiftDateByDays,
+} from '../lib/gantt'
+import type { TaskFields } from '../lib/editor'
 import { HEADER_HEIGHT, MONTH_BAND_HEIGHT } from './constants'
 
 export interface GanttChartProps {
   layout: GanttLayout
   /** 選択中タスク id(該当バーを強調) */
   selectedId: string | null
-  /** バークリックで行選択に連動 */
+  /** バークリック・キーボードでの行選択に連動 */
   onSelectBar: (id: string) => void
+  /** バードラッグ・キーボードでの start / estimate 変更を反映する */
+  onUpdateTask: (id: string, changes: Partial<TaskFields>) => void
 }
 
 const DAY_BAND_HEIGHT = HEADER_HEIGHT - MONTH_BAND_HEIGHT
 
 function GanttChart(props: GanttChartProps) {
-  const { layout, selectedId, onSelectBar } = props
+  const { layout, selectedId, onSelectBar, onUpdateTask } = props
   const { width, height, dayWidth } = layout
 
   if (layout.days.length === 0) {
@@ -164,7 +175,9 @@ function GanttChart(props: GanttChartProps) {
               key={row.id}
               row={row}
               selected={row.id === selectedId}
+              dayWidth={dayWidth}
               onSelect={onSelectBar}
+              onUpdateTask={onUpdateTask}
             />
           ))}
         </svg>
@@ -176,27 +189,163 @@ function GanttChart(props: GanttChartProps) {
 interface BarProps {
   row: GanttRowLayout
   selected: boolean
+  /** 1 暦日あたりの px 幅(px 移動量 → 日数スナップに使う) */
+  dayWidth: number
   onSelect: (id: string) => void
+  onUpdateTask: (id: string, changes: Partial<TaskFields>) => void
 }
 
-/** 1 行ぶんのバー(kind に応じて task / summary / milestone を描き分ける) */
-function Bar({ row, selected, onSelect }: BarProps) {
-  const handleClick = (): void => onSelect(row.id)
+/** ドラッグの種別。move = バー本体(start 変更)、resize = 右端(estimate 変更) */
+type DragMode = 'move' | 'resize'
+
+/** クリック(選択)とドラッグを区別する閾値(px) */
+const DRAG_THRESHOLD = 4
+/** バー右端のリサイズハンドルの当たり幅(px) */
+const RESIZE_HANDLE = 8
+
+/**
+ * 1 行ぶんのバー(kind に応じて task / summary / milestone を描き分ける)。
+ * task / milestone はポインタドラッグとキーボードで start / estimate を編集でき、
+ * すべての kind はフォーカス可能で Enter/Space による選択・↑↓ でのフォーカス移動に対応する。
+ */
+function Bar({ row, selected, dayWidth, onSelect, onUpdateTask }: BarProps) {
+  // ドラッグ中のプレビュー(確定は pointerup)。null なら非ドラッグ
+  const [drag, setDrag] = useState<{
+    mode: DragMode
+    deltaDays: number
+  } | null>(null)
+  // pointermove/up で参照する進行中ドラッグの情報。再レンダーを挟まず読める ref に持つ
+  const active = useRef<{
+    mode: DragMode
+    startX: number
+    moved: boolean
+  } | null>(null)
+  const draggable = row.kind !== 'summary'
+
+  // ドラッグ中のみ Esc でキャンセルできるようにする
+  useEffect(() => {
+    if (drag === null) return
+    const handleKey = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        active.current = null
+        setDrag(null)
+        setDragBodyClass(null)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [drag])
+
+  const beginDrag = (mode: DragMode, event: PointerEvent<SVGElement>): void => {
+    if (!draggable) return
+    if (mode === 'resize' && row.kind !== 'task') return // リサイズは task のみ
+    event.stopPropagation()
+    onSelect(row.id) // 押下時点で選択(クリック選択を維持)
+    active.current = { mode, startX: event.clientX, moved: false }
+    setDrag({ mode, deltaDays: 0 })
+    setDragBodyClass(mode)
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const moveDrag = (event: PointerEvent<SVGElement>): void => {
+    const current = active.current
+    if (current === null) return
+    const rawDelta = event.clientX - current.startX
+    if (Math.abs(rawDelta) >= DRAG_THRESHOLD) current.moved = true
+    setDrag({ mode: current.mode, deltaDays: pxToDayDelta(rawDelta, dayWidth) })
+  }
+
+  const endDrag = (event: PointerEvent<SVGElement>): void => {
+    const current = active.current
+    if (current === null) return
+    active.current = null
+    releaseCapture(event)
+    setDrag(null)
+    setDragBodyClass(null)
+    const deltaDays = pxToDayDelta(event.clientX - current.startX, dayWidth)
+    // 閾値未満(=クリック)や実質移動なしは選択のみで確定しない
+    if (!current.moved || deltaDays === 0) return
+    if (current.mode === 'move') {
+      onUpdateTask(row.id, { start: shiftDateByDays(row.start, deltaDays) })
+    } else {
+      const newEnd = shiftDateByDays(row.end, deltaDays)
+      onUpdateTask(row.id, { estimate: estimateFromRange(row.start, newEnd) })
+    }
+  }
+
+  const cancelDrag = (event: PointerEvent<SVGElement>): void => {
+    if (active.current === null) return
+    active.current = null
+    releaseCapture(event)
+    setDrag(null)
+    setDragBodyClass(null)
+  }
+
+  const handleKeyDown = (event: KeyboardEvent<SVGElement>): void => {
+    switch (event.key) {
+      case 'Enter':
+      case ' ':
+        event.preventDefault()
+        onSelect(row.id)
+        break
+      case 'ArrowUp':
+      case 'ArrowDown':
+        event.preventDefault()
+        focusSibling(event.currentTarget, event.key === 'ArrowDown' ? 1 : -1)
+        break
+      case 'ArrowLeft':
+      case 'ArrowRight':
+        if (row.kind === 'summary') break // サマリーは start 変更の対象外
+        event.preventDefault()
+        onSelect(row.id)
+        onUpdateTask(row.id, {
+          start: shiftDateByBusinessDays(
+            row.start,
+            event.key === 'ArrowRight' ? 1 : -1,
+          ),
+        })
+        break
+    }
+  }
+
+  // ドラッグ中のプレビュー座標(未ドラッグ時は素の値)
+  const shift = (drag?.deltaDays ?? 0) * dayWidth
+  const isMove = drag?.mode === 'move'
+  const isResize = drag?.mode === 'resize'
+  const x = isMove ? row.x + shift : row.x
+  const cx = isMove ? row.cx + shift : row.cx
+  const barWidth = isResize ? Math.max(dayWidth, row.width + shift) : row.width
+  const progressWidth = Math.min(row.progressWidth, barWidth)
   const selectedClass = selected ? ' selected' : ''
+  const ariaLabel = barAriaLabel(row)
+
+  const pointerHandlers = draggable
+    ? {
+        onPointerMove: moveDrag,
+        onPointerUp: endDrag,
+        onPointerCancel: cancelDrag,
+      }
+    : {}
 
   if (row.kind === 'milestone') {
     const half = row.barHeight / 2
     const points = [
-      `${row.cx},${row.cy - half}`,
-      `${row.cx + half},${row.cy}`,
-      `${row.cx},${row.cy + half}`,
-      `${row.cx - half},${row.cy}`,
+      `${cx},${row.cy - half}`,
+      `${cx + half},${row.cy}`,
+      `${cx},${row.cy + half}`,
+      `${cx - half},${row.cy}`,
     ].join(' ')
     return (
       <polygon
         className={`gantt-milestone${selectedClass}`}
         points={points}
-        onClick={handleClick}
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        data-gantt-bar={row.id}
+        onKeyDown={handleKeyDown}
+        onPointerDown={(event) => beginDrag('move', event)}
+        {...pointerHandlers}
       />
     )
   }
@@ -212,34 +361,93 @@ function Bar({ row, selected, onSelect }: BarProps) {
         width={row.width}
         height={summaryHeight}
         rx={2}
-        onClick={handleClick}
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        data-gantt-bar={row.id}
+        onClick={() => onSelect(row.id)}
+        onKeyDown={handleKeyDown}
       />
     )
   }
 
-  // task
+  // task: 本体(移動)+ 進捗オーバーレイ + 右端ハンドル(リサイズ)
   return (
-    <g onClick={handleClick} className="gantt-bar-group">
+    <g className="gantt-bar-group">
       <rect
         className={`gantt-bar${selectedClass}`}
-        x={row.x}
+        x={x}
         y={row.barY}
-        width={row.width}
+        width={barWidth}
         height={row.barHeight}
         rx={4}
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        data-gantt-bar={row.id}
+        onKeyDown={handleKeyDown}
+        onPointerDown={(event) => beginDrag('move', event)}
+        {...pointerHandlers}
       />
-      {row.progressWidth > 0 ? (
+      {progressWidth > 0 ? (
         <rect
           className="gantt-progress"
-          x={row.x}
+          x={x}
           y={row.barY}
-          width={row.progressWidth}
+          width={progressWidth}
           height={row.barHeight}
           rx={4}
         />
       ) : null}
+      <rect
+        className="gantt-bar-handle"
+        x={x + barWidth - Math.min(RESIZE_HANDLE, barWidth)}
+        y={row.barY}
+        width={Math.min(RESIZE_HANDLE, barWidth)}
+        height={row.barHeight}
+        aria-hidden="true"
+        onPointerDown={(event) => beginDrag('resize', event)}
+        {...pointerHandlers}
+      />
     </g>
   )
+}
+
+/** バーのアクセシブルな説明ラベルを作る(例: 「設計 2026-07-01〜2026-07-03」) */
+function barAriaLabel(row: GanttRowLayout): string {
+  const title = row.title || '(無題)'
+  if (row.kind === 'milestone') return `${title} マイルストーン ${row.start}`
+  return `${title} ${row.start}〜${row.end}`
+}
+
+/** ドラッグ中のカーソルをページ全体で統一するための body クラスを切り替える */
+function setDragBodyClass(mode: DragMode | null): void {
+  if (typeof document === 'undefined') return
+  const { classList } = document.body
+  classList.toggle('is-gantt-moving', mode === 'move')
+  classList.toggle('is-gantt-resizing', mode === 'resize')
+}
+
+/** 進行中ドラッグのポインタキャプチャを解放する(すでに解放済みでも例外にしない) */
+function releaseCapture(event: PointerEvent<SVGElement>): void {
+  try {
+    event.currentTarget.releasePointerCapture(event.pointerId)
+  } catch {
+    // 解放済み・別要素キャプチャ時の例外は無視する
+  }
+}
+
+/**
+ * DOM 順で前後のバー(data-gantt-bar を持つ要素)へフォーカスを移す。
+ * dir = 1 で次、-1 で前。端では移動しない。
+ */
+function focusSibling(current: SVGElement, dir: 1 | -1): void {
+  const svg = current.closest('svg.gantt-body')
+  if (svg === null) return
+  const bars = Array.from(svg.querySelectorAll<SVGElement>('[data-gantt-bar]'))
+  const index = bars.indexOf(current)
+  const next = bars[index + dir]
+  if (next) next.focus()
 }
 
 export default GanttChart

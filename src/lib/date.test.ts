@@ -10,6 +10,7 @@ import {
   maxDate,
   minDate,
   parseDate,
+  shiftBusinessDays,
 } from './date'
 
 // 2026-07-13(月)〜 2026-07-20(月)を基準にする
@@ -70,6 +71,24 @@ describe('businessDayEnd', () => {
     expect(formatDate(businessDayEnd(parseDate(MON), 5))).toBe(FRI)
     // 月から 6 営業日 -> 翌月曜終わり
     expect(formatDate(businessDayEnd(parseDate(MON), 6))).toBe(NEXT_MON)
+  })
+})
+
+describe('shiftBusinessDays', () => {
+  it('n=0 はそのまま返す', () => {
+    expect(formatDate(shiftBusinessDays(parseDate(MON), 0))).toBe(MON)
+  })
+
+  it('正方向は土日を飛ばして進める', () => {
+    // 金 + 1 営業日 -> 翌月曜
+    expect(formatDate(shiftBusinessDays(parseDate(FRI), 1))).toBe(NEXT_MON)
+  })
+
+  it('負方向は土日を飛ばして戻す', () => {
+    // 翌月曜 - 1 営業日 -> 金
+    expect(formatDate(shiftBusinessDays(parseDate(NEXT_MON), -1))).toBe(FRI)
+    // 月 - 1 営業日 -> 前週金曜
+    expect(formatDate(shiftBusinessDays(parseDate(MON), -1))).toBe('2026-07-10')
   })
 })
 

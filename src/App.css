@@ -529,12 +529,18 @@ body.is-resizing-cols {
 }
 
 .gantt-bar-group {
-  cursor: pointer;
+  cursor: grab;
 }
 
 .gantt-bar {
   fill: var(--bar-task);
-  cursor: pointer;
+  cursor: grab;
+}
+
+/* バー右端のリサイズ当たり判定(見た目は透明) */
+.gantt-bar-handle {
+  fill: transparent;
+  cursor: ew-resize;
 }
 
 .gantt-progress {
@@ -549,7 +555,7 @@ body.is-resizing-cols {
 
 .gantt-milestone {
   fill: var(--milestone);
-  cursor: pointer;
+  cursor: grab;
 }
 
 .gantt-bar.selected,
@@ -557,6 +563,34 @@ body.is-resizing-cols {
 .gantt-milestone.selected {
   stroke: var(--bar-stroke-selected);
   stroke-width: 1.5;
+}
+
+/* キーボードフォーカスの可視化(選択の強調 .selected と両立させる) */
+.gantt-bar:focus,
+.gantt-summary:focus,
+.gantt-milestone:focus {
+  outline: none;
+}
+
+.gantt-bar:focus-visible,
+.gantt-summary:focus-visible,
+.gantt-milestone:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ドラッグ中はページ全体でカーソルを統一し、テキスト選択を抑止する */
+body.is-gantt-moving,
+body.is-gantt-resizing {
+  user-select: none;
+}
+
+body.is-gantt-moving * {
+  cursor: grabbing !important;
+}
+
+body.is-gantt-resizing * {
+  cursor: ew-resize !important;
 }
 
 .gantt-arrow {

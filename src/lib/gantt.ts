@@ -10,11 +10,13 @@
  */
 import {
   addDays,
+  businessDaysBetween,
   formatDate,
   isWeekend,
   maxDate,
   minDate,
   parseDate,
+  shiftBusinessDays,
   today,
 } from './date'
 import type { ScheduledTask } from './schedule'
@@ -73,6 +75,12 @@ export type GanttBarKind = 'task' | 'summary' | 'milestone'
 export interface GanttRowLayout {
   /** task.id */
   id: string
+  /** タスク名(アクセシビリティ用のラベルなどで使う) */
+  title: string
+  /** 開始日 'YYYY-MM-DD'(scheduled.start。バードラッグの起点日) */
+  start: string
+  /** 終了日 'YYYY-MM-DD'(scheduled.end。milestone は start と同じ) */
+  end: string
   /** visibleRows での 0 始まり index */
   rowIndex: number
   /** 行の上端 = rowIndex * rowHeight */
@@ -218,6 +226,9 @@ export function computeGanttLayout(
     if (kind === 'milestone') {
       return {
         id: scheduled.task.id,
+        title: scheduled.task.title,
+        start: scheduled.start,
+        end: scheduled.end,
         rowIndex,
         y,
         kind,
@@ -240,6 +251,9 @@ export function computeGanttLayout(
         : 0
     return {
       id: scheduled.task.id,
+      title: scheduled.task.title,
+      start: scheduled.start,
+      end: scheduled.end,
       rowIndex,
       y,
       kind,
@@ -332,4 +346,36 @@ function clamp(value: number, min: number, max: number): number {
 function resolveToday(value: GanttLayoutOptions['today']): Date {
   if (value === undefined) return today()
   return typeof value === 'string' ? parseDate(value) : value
+}
+
+// --- バードラッグ / キーボード操作のための座標↔日付変換(純粋関数) ---
+// UI(GanttChart)はここを呼ぶだけにして、日付計算を UI 側で再発明しない。
+
+/** ドラッグの px 移動量を日カラム数に丸める(round スナップ)。dayWidth > 0 前提 */
+export function pxToDayDelta(deltaPx: number, dayWidth: number): number {
+  return Math.round(deltaPx / dayWidth)
+}
+
+/** 'YYYY-MM-DD' を暦日で deltaDays ずらす(バー本体ドラッグでの start 変更) */
+export function shiftDateByDays(date: string, deltaDays: number): string {
+  return formatDate(addDays(parseDate(date), deltaDays))
+}
+
+/** 'YYYY-MM-DD' を営業日で n 日ずらす(キーボード ←/→ での start 変更。n は負も可) */
+export function shiftDateByBusinessDays(date: string, n: number): string {
+  return formatDate(shiftBusinessDays(parseDate(date), n))
+}
+
+/**
+ * バー右端ドラッグ後の終了日から estimate 文字列(日単位)を求める。
+ * 開始〜終了の営業日数(両端含む)を日数にする。最小 1 営業日。
+ * 終了日が開始日より前になった場合は開始日にクランプする。
+ */
+export function estimateFromRange(start: string, end: string): string {
+  const startDate = parseDate(start)
+  const endDate = parseDate(end)
+  const clampedEnd =
+    endDate.getTime() < startDate.getTime() ? startDate : endDate
+  const days = Math.max(1, businessDaysBetween(startDate, clampedEnd))
+  return `${days}d`
 }
