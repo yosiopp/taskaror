@@ -70,7 +70,7 @@
 
 - [x] Undo / Redo
 - [x] バーのドラッグによる start・estimate の変更
-- [ ] 読み込んだ YAML の忠実性(コメント・キー順・引用符スタイルの保持。yaml の Document API を検討)
+- [x] 読み込んだ YAML の忠実性(コメント・キー順・引用符スタイルの保持。yaml の Document API を検討)
 - [x] YAML テキストエディタビュー(GUI との切り替え。素の textarea + 適用/破棄。CodeMirror 等のハイライトは将来対応)
 - [x] WBS 番号付きテーブルビュー(WBS 番号は `src/lib/wbs.ts` の `computeWbs` で導出。開始・終了は scheduleTasks を再利用)
 - [x] クリティカルパスのハイライト

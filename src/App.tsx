@@ -38,7 +38,9 @@ import type {
   TaskFields,
 } from './lib/editor'
 import { canRedo, canUndo, initHistory, withHistory } from './lib/history'
-import { flattenTasks, parseTaskSpec, serializeTaskSpec } from './lib/taskspec'
+import { flattenTasks, serializeTaskSpec } from './lib/taskspec'
+import { parseTaskSpecDocument } from './lib/fidelity'
+import type { Document } from 'yaml'
 import { emptyTaskSpec, ganttImageFileName, taskSpecFileName } from './lib/file'
 import { validateTaskSpec } from './lib/validate'
 import { scheduleTasks } from './lib/schedule'
@@ -66,37 +68,61 @@ const EMPTY_LAYOUT: GanttLayout = computeGanttLayout([], {
   rowHeight: ROW_HEIGHT,
 })
 
-/** localStorage の保存キー */
+/** localStorage の保存キー(旧: JSON 形式。後方互換のため読み込みのみ対応) */
 const STORAGE_KEY = 'taskaror:spec'
+/** localStorage の保存キー(新: YAML テキスト。コメント等の忠実性を保つ) */
+const STORAGE_KEY_YAML = 'taskaror:spec.yaml'
+
+/** localStorage から文字列を読む(失敗しても null を返す) */
+function readStorage(key: string): string | null {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
 
 /**
  * localStorage から編集内容を復元する(ブラウザ専用)。
+ * 新形式(YAML テキスト)を優先し、コメント等を保持したベース Document も復元する。
+ * 旧形式(JSON)からは spec のみ移行する(忠実性のベースは持てないので doc は null)。
  * 未保存・壊れている・検証に通らない場合は null を返し、サンプルにフォールバックさせる。
  */
-function loadStoredSpec(): TaskSpec | null {
-  if (typeof localStorage === 'undefined') return null
-  let raw: string | null
-  try {
-    raw = localStorage.getItem(STORAGE_KEY)
-  } catch {
-    return null
+function loadStoredSpec(): { spec: TaskSpec; doc: Document | null } | null {
+  // 新形式: YAML テキスト(ベース Document も一緒に復元してコメント等を保つ)
+  const yamlText = readStorage(STORAGE_KEY_YAML)
+  if (yamlText !== null) {
+    try {
+      const parsed = parseTaskSpecDocument(yamlText)
+      if (validateTaskSpec(parsed.spec).length === 0) return parsed
+    } catch {
+      // 壊れていれば旧形式・サンプルへフォールバックする
+    }
   }
-  if (raw === null) return null
-  let data: unknown
-  try {
-    data = JSON.parse(raw)
-  } catch {
-    return null
+  // 旧形式: JSON(コメント等のベースは持てないので plain 扱い)
+  const json = readStorage(STORAGE_KEY)
+  if (json !== null) {
+    try {
+      const data: unknown = JSON.parse(json)
+      if (validateTaskSpec(data).length === 0) {
+        return { spec: data as TaskSpec, doc: null }
+      }
+    } catch {
+      // ignore
+    }
   }
-  if (validateTaskSpec(data).length > 0) return null
-  return data as TaskSpec
+  return null
 }
 
-/** 編集内容を localStorage に保存する(ブラウザ専用。失敗しても無視する) */
-function saveStoredSpec(spec: TaskSpec): void {
+/**
+ * 編集内容を localStorage に YAML テキストで保存する(ブラウザ専用。失敗しても無視する)。
+ * baseDoc があれば忠実性を効かせて serialize するので、リロード後もコメント等が残る。
+ */
+function saveStoredSpec(spec: TaskSpec, baseDoc: Document | null): void {
   if (typeof localStorage === 'undefined') return
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(spec))
+    localStorage.setItem(STORAGE_KEY_YAML, serializeTaskSpec(spec, baseDoc))
   } catch {
     // 容量超過やプライベートモードでの失敗は無視する
   }
@@ -292,13 +318,26 @@ function isEditableTarget(target: EventTarget | null): boolean {
   )
 }
 
+/**
+ * 初期状態(編集用 spec と忠実性のベース Document)を求める。
+ * localStorage に妥当な編集内容があればそれを、なければサンプルを使う。
+ */
+function computeInitial(): { spec: TaskSpec; doc: Document | null } {
+  const stored = loadStoredSpec()
+  if (stored !== null) return stored
+  return parseTaskSpecDocument(sampleSource)
+}
+
 function App() {
-  // localStorage に妥当な編集内容があればそれを、なければサンプルを初期状態にする
+  // 初期 spec とベース Document を一度だけ求める(lazy initializer)
+  const [initial] = useState(computeInitial)
   const [history, dispatch] = useReducer(historyReducer, undefined, () =>
-    initHistory<TaskSpec, EditorAction>(
-      loadStoredSpec() ?? parseTaskSpec(sampleSource),
-    ),
+    initHistory<TaskSpec, EditorAction>(initial.spec),
   )
+  // 忠実性のベース Document(読み込んだ YAML のコメント・キー順・引用符スタイルの保持元)。
+  // GUI 編集では変わらず、読み込み/YAML ビュー適用時に差し替え、新規作成時に null にする。
+  // YAML ビューの描画に render 時に参照するため ref ではなく state で持つ。
+  const [baseDoc, setBaseDoc] = useState<Document | null>(initial.doc)
   // present を従来の spec として扱う(編集・派生・保存はすべて present 基準)
   const spec = history.present
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
@@ -313,10 +352,12 @@ function App() {
   // 「今日」('YYYY-MM-DD')。今日線・スケジュールの基準日。日付をまたぐと更新する
   const [today, setToday] = useState<string>(() => formatDate(localToday()))
 
-  // spec が変わるたびに localStorage へ保存する(リロードでの作業消失を防ぐ)
+  // spec が変わるたびに localStorage へ保存する(リロードでの作業消失を防ぐ)。
+  // ベース Document を使って忠実性を効かせるので、リロード後もコメント等が残る。
+  // baseDoc は読み込み/適用/新規で spec と一緒に変わるため、両方を依存に入れる。
   useEffect(() => {
-    saveStoredSpec(spec)
-  }, [spec])
+    saveStoredSpec(spec, baseDoc)
+  }, [spec, baseDoc])
 
   // ビューモードを localStorage に保存する(次回起動時に同じビューで開く)
   useEffect(() => {
@@ -576,13 +617,16 @@ function App() {
     ) {
       return
     }
+    // 新規作成では忠実性のベースを捨てる(以後は plain stringify)
+    setBaseDoc(null)
     dispatch({ type: 'replaceSpec', spec: emptyTaskSpec() })
     setSelectedId(null)
     setLoadError(null)
   }
 
   const handleSave = (): void => {
-    downloadText(serializeTaskSpec(spec), taskSpecFileName(spec))
+    // ベース Document を使って未変更部分のコメント・キー順・引用符スタイルを保つ
+    downloadText(serializeTaskSpec(spec, baseDoc), taskSpecFileName(spec))
   }
 
   // --- エクスポート(SVG / PNG) ---
@@ -633,20 +677,22 @@ function App() {
 
   /** 読み込んだテキストをパース・検証し、問題なければ spec を置き換える */
   const loadFromText = (text: string): void => {
-    let parsed: TaskSpec
+    let parsed: { spec: TaskSpec; doc: Document }
     try {
-      parsed = parseTaskSpec(text)
+      // 編集用 spec と、忠実性のベース Document(コメント等を保持)の両方を得る
+      parsed = parseTaskSpecDocument(text)
     } catch (thrown) {
       const message = thrown instanceof Error ? thrown.message : String(thrown)
       setLoadError({ kind: 'parse', message })
       return
     }
-    const issues = validateTaskSpec(parsed)
+    const issues = validateTaskSpec(parsed.spec)
     if (issues.length > 0) {
       setLoadError({ kind: 'validation', issues })
       return
     }
-    dispatch({ type: 'replaceSpec', spec: parsed })
+    setBaseDoc(parsed.doc)
+    dispatch({ type: 'replaceSpec', spec: parsed.spec })
     setSelectedId(null)
     setLoadError(null)
   }
@@ -787,7 +833,11 @@ function App() {
       ) : viewMode === 'yaml' ? (
         <YamlView
           spec={spec}
-          onApply={(next) => {
+          baseDoc={baseDoc}
+          onApply={(next, doc) => {
+            // 適用したユーザー入力テキストを新しいベース Document にする
+            // (以後の GUI 編集はこのテキスト基準で忠実性 reconcile される)
+            setBaseDoc(doc)
             dispatch({ type: 'replaceSpec', spec: next })
             setSelectedId(null)
           }}

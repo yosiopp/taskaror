@@ -1,6 +1,8 @@
-import { parse, stringify } from 'yaml'
+import { isMap, parse, stringify } from 'yaml'
+import type { Document } from 'yaml'
 import type { Task, TaskSpec } from '../types/taskspec'
 import { TASKSPEC_VERSION } from '../types/taskspec'
+import { reconcileDocument } from './fidelity'
 
 export class TaskSpecError extends Error {}
 
@@ -28,8 +30,22 @@ export function parseTaskSpec(source: string): TaskSpec {
   return spec as TaskSpec
 }
 
-export function serializeTaskSpec(spec: TaskSpec): string {
-  return stringify(spec)
+/**
+ * TaskSpec を YAML 文字列へシリアライズする。
+ *
+ * baseDoc を渡すと、そのクローンに spec を差分適用(reconcile)して stringify し、
+ * 未変更部分のコメント・キー順・引用符スタイルを保つ(読み込んだ YAML の忠実性)。
+ * baseDoc が無い(新規/空)場合やルートがマップでない場合は、従来どおり plain stringify
+ * にフォールバックする(後方互換)。
+ */
+export function serializeTaskSpec(
+  spec: TaskSpec,
+  baseDoc?: Document | null,
+): string {
+  if (!baseDoc || !isMap(baseDoc.contents)) return stringify(spec)
+  const doc = baseDoc.clone()
+  reconcileDocument(doc, spec)
+  return doc.toString()
 }
 
 export interface FlatTask {
