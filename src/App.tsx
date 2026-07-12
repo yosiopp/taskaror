@@ -11,9 +11,15 @@ import sampleSource from '../examples/ecommerce.taskspec.yaml?raw'
 import Toolbar from './components/Toolbar'
 import TaskGrid from './components/TaskGrid'
 import GanttChart from './components/GanttChart'
+import PaneSeparator from './components/PaneSeparator'
 import LoadErrorNotice from './components/LoadError'
 import type { LoadError } from './components/LoadError'
-import { DAY_WIDTH, ROW_HEIGHT } from './components/constants'
+import { DAY_WIDTH, GRID_WIDTH, ROW_HEIGHT } from './components/constants'
+import {
+  clampGridWidth,
+  maxGridWidth,
+  parseStoredGridWidth,
+} from './components/paneWidth'
 import { editorReducer, newTask } from './lib/editor'
 import type { AddMode, EditorAction, TaskFields } from './lib/editor'
 import { canRedo, canUndo, initHistory, withHistory } from './lib/history'
@@ -66,6 +72,35 @@ function saveStoredSpec(spec: TaskSpec): void {
   if (typeof localStorage === 'undefined') return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(spec))
+  } catch {
+    // 容量超過やプライベートモードでの失敗は無視する
+  }
+}
+
+/** グリッド幅の保存キー */
+const GRID_WIDTH_KEY = 'taskaror:gridWidth'
+
+/**
+ * localStorage から保存済みのグリッド幅を復元する(ブラウザ専用)。
+ * 未保存・壊れている・範囲外なら既定幅にフォールバックする。SSR では既定幅。
+ */
+function loadStoredGridWidth(): number {
+  if (typeof window === 'undefined') return GRID_WIDTH
+  const max = maxGridWidth(window.innerWidth)
+  let raw: string | null
+  try {
+    raw = localStorage.getItem(GRID_WIDTH_KEY)
+  } catch {
+    return clampGridWidth(GRID_WIDTH, max)
+  }
+  return parseStoredGridWidth(raw, max, GRID_WIDTH)
+}
+
+/** グリッド幅を localStorage に保存する(ブラウザ専用。失敗しても無視する) */
+function saveStoredGridWidth(width: number): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(GRID_WIDTH_KEY, String(Math.round(width)))
   } catch {
     // 容量超過やプライベートモードでの失敗は無視する
   }
@@ -193,29 +228,30 @@ function App() {
   const { visibleRows, layout } = derived
   const error = computation.ok ? null : computation.error
 
-  // --- スクロール同期(左グリッド ⇔ 右ガントの縦スクロール) ---
-  const gridScrollRef = useRef<HTMLDivElement>(null)
-  const ganttScrollRef = useRef<HTMLDivElement>(null)
-  const syncingRef = useRef(false)
+  // --- ペイン幅(左グリッド)のドラッグリサイズ ---
+  // 縦スクロールは 1 つの共有コンテナ(.editor-scroll)に集約したので、
+  // 左右で scrollTop を同期する必要はなくなった(行ずれが原理的に起きない)。
+  const [gridWidth, setGridWidth] = useState<number>(() =>
+    loadStoredGridWidth(),
+  )
+  // セパレータが幅の基準(左端座標)にするコンテナ
+  const appBodyRef = useRef<HTMLDivElement>(null)
 
-  const syncScroll = (
-    source: HTMLDivElement | null,
-    target: HTMLDivElement | null,
-  ): void => {
-    if (syncingRef.current || !source || !target) return
-    syncingRef.current = true
-    target.scrollTop = source.scrollTop
-    // 連鎖した onScroll を 1 フレーム分だけ無視してループを防ぐ
-    window.requestAnimationFrame(() => {
-      syncingRef.current = false
-    })
-  }
+  // ウィンドウが縮んで上限が下がったら、はみ出さないよう現在の幅を丸め直す
+  useEffect(() => {
+    const handleResize = (): void => {
+      setGridWidth((prev) =>
+        clampGridWidth(prev, maxGridWidth(window.innerWidth)),
+      )
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
-  const handleGridScroll = (): void => {
-    syncScroll(gridScrollRef.current, ganttScrollRef.current)
-  }
-  const handleGanttScroll = (): void => {
-    syncScroll(ganttScrollRef.current, gridScrollRef.current)
+  /** ドラッグ終了・キー操作で確定した幅を反映しつつ永続化する */
+  const commitGridWidth = (width: number): void => {
+    setGridWidth(width)
+    saveStoredGridWidth(width)
   }
 
   // --- 編集ハンドラ ---
@@ -390,23 +426,30 @@ function App() {
         </div>
       ) : null}
 
-      <div className="app-body">
-        <TaskGrid
-          visibleRows={visibleRows}
-          allTasks={allTasks}
-          selectedId={selectedId}
-          scrollRef={gridScrollRef}
-          onScroll={handleGridScroll}
-          onSelect={setSelectedId}
-          onToggleCollapse={handleToggleCollapse}
-          onUpdate={handleUpdate}
-        />
-        <GanttChart
-          layout={layout}
-          selectedId={selectedId}
-          scrollRef={ganttScrollRef}
-          onScroll={handleGanttScroll}
-          onSelectBar={setSelectedId}
+      <div className="app-body" ref={appBodyRef}>
+        {/* 唯一の縦横スクロール容器。左グリッドと右ガントを同じ容器に入れ、
+            グリッドは横スクロール時に左端へ固定(sticky)することで行を常に一致させる */}
+        <div className="editor-scroll">
+          <TaskGrid
+            visibleRows={visibleRows}
+            allTasks={allTasks}
+            selectedId={selectedId}
+            gridWidth={gridWidth}
+            onSelect={setSelectedId}
+            onToggleCollapse={handleToggleCollapse}
+            onUpdate={handleUpdate}
+          />
+          <GanttChart
+            layout={layout}
+            selectedId={selectedId}
+            onSelectBar={setSelectedId}
+          />
+        </div>
+        <PaneSeparator
+          gridWidth={gridWidth}
+          containerRef={appBodyRef}
+          onResize={setGridWidth}
+          onCommitWidth={commitGridWidth}
         />
       </div>
 

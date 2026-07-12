@@ -4,23 +4,12 @@
  * ガントと行を揃える。セルはインライン編集でき、コミットは updateTask を dispatch する。
  */
 import { useEffect, useRef, useState } from 'react'
-import type {
-  ChangeEvent,
-  KeyboardEvent,
-  ReactElement,
-  RefObject,
-  UIEvent,
-} from 'react'
+import type { ChangeEvent, KeyboardEvent, ReactElement } from 'react'
 import type { GanttRow } from '../lib/gantt'
 import type { TaskFields } from '../lib/editor'
 import type { FlatTask } from '../lib/taskspec'
 import type { Task } from '../types/taskspec'
-import {
-  GRID_COLUMNS,
-  GRID_WIDTH,
-  HEADER_HEIGHT,
-  ROW_HEIGHT,
-} from './constants'
+import { GRID_COLUMNS, HEADER_HEIGHT, ROW_HEIGHT } from './constants'
 
 /** インライン編集できる列(依存は専用ポップオーバーのため含めない) */
 type EditableField = 'title' | 'estimate' | 'start' | 'assignees' | 'progress'
@@ -47,9 +36,8 @@ export interface TaskGridProps {
   /** 依存編集の選択肢に使う全タスク(深さ付き平坦化) */
   allTasks: FlatTask[]
   selectedId: string | null
-  /** スクロール同期用のコンテナ ref */
-  scrollRef: RefObject<HTMLDivElement | null>
-  onScroll: (event: UIEvent<HTMLDivElement>) => void
+  /** グリッド列の幅(px)。セパレータのドラッグで変わる */
+  gridWidth: number
   onSelect: (id: string) => void
   onToggleCollapse: (id: string) => void
   onUpdate: (id: string, changes: Partial<TaskFields>) => void
@@ -60,8 +48,7 @@ function TaskGrid(props: TaskGridProps) {
     visibleRows,
     allTasks,
     selectedId,
-    scrollRef,
-    onScroll,
+    gridWidth,
     onSelect,
     onToggleCollapse,
     onUpdate,
@@ -163,10 +150,8 @@ function TaskGrid(props: TaskGridProps) {
 
   return (
     <div
-      className="grid-pane"
-      ref={scrollRef}
-      onScroll={onScroll}
-      style={{ flex: `0 0 ${GRID_WIDTH}px`, width: GRID_WIDTH }}
+      className="grid-col"
+      style={{ flex: `0 0 ${gridWidth}px`, width: gridWidth }}
     >
       <div
         className="grid-header"

@@ -209,20 +209,76 @@
   border-radius: 8px;
 }
 
-/* --- 本文(左グリッド + 右ガント) --- */
+/* --- 本文(左グリッド + 右ガントを 1 つのスクロール容器で共有) --- */
+/* セパレータ(絶対配置)の基準にするため position: relative */
 .app-body {
+  position: relative;
   flex: 1;
   min-height: 0;
-  display: flex;
   overflow: hidden;
 }
 
-/* --- 左タスクグリッド --- */
-.grid-pane {
-  overflow-y: auto;
-  overflow-x: hidden;
+/* 唯一のスクロール容器。縦横スクロールをここに集約し、左右の行ずれを原理的に無くす。
+   縦スクロールを 1 本にするため、子(グリッド/ガント)は自然な高さのまま上寄せに置く。 */
+.editor-scroll {
+  height: 100%;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  background: var(--surface);
+}
+
+/* --- 左タスクグリッド(横スクロール時は左端に固定して行を揃える) --- */
+.grid-col {
+  position: sticky;
+  left: 0;
+  /* ガント側より前面に置き、横スクロールで潜り込むガントを覆い隠す */
+  z-index: 3;
   border-right: 1px solid var(--border);
   background: var(--surface);
+}
+
+/* --- ペイン境界のセパレータ(ドラッグ/キーで幅変更) --- */
+/* app-body 基準の絶対配置オーバーレイ。スクロールとは独立して常に境界上に表示する。
+   left はインラインで gridWidth を指定し、translateX(-50%) で境界線上に中央寄せする。 */
+.pane-separator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  width: 10px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+  /* 掴みやすい当たり判定は保ちつつ、当たり判定自体の背景は透明にする */
+  background: transparent;
+  touch-action: none;
+}
+
+/* 中央の縦線。既定は透明(グリッドの border-right が見える)、hover/focus/操作中に強調 */
+.pane-separator-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+}
+
+.pane-separator:hover .pane-separator-line,
+.pane-separator:focus-visible .pane-separator-line,
+body.is-resizing-cols .pane-separator-line {
+  background: var(--accent);
+}
+
+.pane-separator:focus-visible {
+  outline: none;
+}
+
+/* ドラッグ中は全体のテキスト選択とカーソルを抑止する */
+body.is-resizing-cols {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .grid-header {
@@ -407,10 +463,10 @@
 }
 
 /* --- 右ガントチャート --- */
-.gantt-pane {
-  flex: 1;
-  min-width: 0;
-  overflow: auto;
+/* flex-basis auto + shrink 0 で SVG 幅(layout.width)を最低幅として確保しつつ、
+   余白があれば伸びて埋める。横スクロールは共有コンテナ(.editor-scroll)が持つ。 */
+.gantt-col {
+  flex: 1 0 auto;
   background: var(--surface);
 }
 

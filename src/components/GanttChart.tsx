@@ -2,10 +2,9 @@
  * 右ペインのガントチャート(自前 SVG 描画)。
  * gantt.ts の computeGanttLayout が返す GanttLayout の座標をそのまま描くだけにし、
  * 座標計算は UI 側で再発明しない。
- * 時間軸ヘッダは sticky top、本文は縦横スクロール。縦スクロールは App で
- * 左グリッドと同期する。
+ * 時間軸ヘッダは sticky top。縦横スクロールは App の共有スクロール容器が受け持つ
+ * ので、このコンポーネント自体はスクロールコンテナを持たない(左右の行ずれ防止)。
  */
-import type { RefObject, UIEvent } from 'react'
 import type { GanttLayout, GanttRowLayout } from '../lib/gantt'
 import { HEADER_HEIGHT, MONTH_BAND_HEIGHT } from './constants'
 
@@ -13,10 +12,6 @@ export interface GanttChartProps {
   layout: GanttLayout
   /** 選択中タスク id(該当バーを強調) */
   selectedId: string | null
-  /** スクロール同期用のコンテナ ref */
-  scrollRef: RefObject<HTMLDivElement | null>
-  /** 縦スクロール同期のためのハンドラ */
-  onScroll: (event: UIEvent<HTMLDivElement>) => void
   /** バークリックで行選択に連動 */
   onSelectBar: (id: string) => void
 }
@@ -24,19 +19,19 @@ export interface GanttChartProps {
 const DAY_BAND_HEIGHT = HEADER_HEIGHT - MONTH_BAND_HEIGHT
 
 function GanttChart(props: GanttChartProps) {
-  const { layout, selectedId, scrollRef, onScroll, onSelectBar } = props
+  const { layout, selectedId, onSelectBar } = props
   const { width, height, dayWidth } = layout
 
   if (layout.days.length === 0) {
     return (
-      <div className="gantt-pane" ref={scrollRef} onScroll={onScroll}>
+      <div className="gantt-col">
         <p className="gantt-empty">表示するタスクがありません</p>
       </div>
     )
   }
 
   return (
-    <div className="gantt-pane" ref={scrollRef} onScroll={onScroll}>
+    <div className="gantt-col">
       <div className="gantt-inner" style={{ width }}>
         <div className="gantt-header" style={{ height: HEADER_HEIGHT }}>
           <svg width={width} height={HEADER_HEIGHT} role="presentation">
