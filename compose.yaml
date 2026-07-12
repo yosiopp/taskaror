@@ -1,0 +1,24 @@
+services:
+  # 開発用: Vite dev server(HMR あり)
+  # docker compose up dev
+  dev:
+    image: node:24-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - '5173:5173'
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+
+  # 本番ビルド確認用: nginx で dist を配信
+  # docker compose --profile prod up web --build
+  web:
+    build: .
+    ports:
+      - '8080:80'
+    profiles:
+      - prod
+
+volumes:
+  node_modules:

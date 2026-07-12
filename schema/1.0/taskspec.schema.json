@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/yosiopp/taskaror/main/schema/1.0/taskspec.schema.json",
+
+  "title": "TaskSpec",
+  "description": "TaskSpec 1.0",
+
+  "type": "object",
+
+  "required": ["taskspec", "tasks"],
+
+  "additionalProperties": false,
+
+  "properties": {
+    "taskspec": {
+      "type": "string",
+      "const": "1.0",
+      "description": "TaskSpec version."
+    },
+
+    "info": {
+      "$ref": "#/$defs/info"
+    },
+
+    "tasks": {
+      "type": "array",
+      "description": "Root tasks.",
+      "items": {
+        "$ref": "#/$defs/task"
+      }
+    }
+  },
+
+  "$defs": {
+    "info": {
+      "type": "object",
+
+      "additionalProperties": false,
+
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Project title."
+        }
+      }
+    },
+
+    "task": {
+      "type": "object",
+
+      "required": ["id", "title"],
+
+      "additionalProperties": false,
+
+      "patternProperties": {
+        "^x-": {}
+      },
+
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]*$",
+          "description": "Unique task identifier."
+        },
+
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Task title."
+        },
+
+        "estimate": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?(h|d)$",
+          "description": "Estimated effort. Represents effort, not elapsed duration. Conversion between days and hours is implementation-defined."
+        },
+
+        "start": {
+          "type": "string",
+          "format": "date",
+          "description": "Scheduled start date."
+        },
+
+        "depends": {
+          "type": "array",
+          "description": "IDs of predecessor tasks.",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+
+        "assignees": {
+          "type": "array",
+          "description": "Task assignees.",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+
+        "progress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Completion percentage."
+        },
+
+        "tags": {
+          "type": "array",
+          "description": "Task tags.",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+
+        "note": {
+          "type": "string",
+          "description": "Markdown note."
+        },
+
+        "tasks": {
+          "type": "array",
+          "description": "Child tasks.",
+          "items": {
+            "$ref": "#/$defs/task"
+          }
+        }
+      }
+    }
+  }
+}
