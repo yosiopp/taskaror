@@ -15,6 +15,12 @@ export const HEADER_HEIGHT = 48
 /** ガント時間軸ヘッダのうち月ラベル帯の px 高(残りが日ラベル帯) */
 export const MONTH_BAND_HEIGHT = 20
 
+/**
+ * ガント日カラム仮想化のオーバースキャン(可視範囲の前後に余分に描く日カラム数)。
+ * スクロール中の再計算が間に合わなくても空白が見えないよう、少し広めに描く。
+ */
+export const GANTT_DAY_OVERSCAN = 12
+
 /** 左タスクグリッドの既定幅(px)。ドラッグでの幅変更の初期値/フォールバック */
 export const GRID_WIDTH = 560
 

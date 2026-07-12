@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskSpec } from '../types/taskspec'
 import {
+  computeDayWindow,
   computeGanttLayout,
   estimateFromRange,
   flattenScheduled,
@@ -387,6 +388,38 @@ describe('computeGanttLayout: 空入力', () => {
       arrows: [],
       todayX: null,
     })
+  })
+})
+
+describe('computeDayWindow', () => {
+  it('可視 X 範囲を日インデックス窓に変換し overscan を前後に足す', () => {
+    // daysCount=100, dayWidth=10。X 200〜350 → 20〜35、overscan 2 → 18〜37
+    expect(computeDayWindow(100, 10, 200, 350, 2)).toEqual({
+      first: 18,
+      last: 37,
+    })
+  })
+
+  it('overscan 0 では floor 変換のみ', () => {
+    expect(computeDayWindow(100, 10, 205, 344, 0)).toEqual({
+      first: 20,
+      last: 34,
+    })
+  })
+
+  it('0 未満・総日数超えは [0, daysCount-1] にクランプする', () => {
+    // first: floor(-5)-3=-8 → 0、last: floor(5)+3=8
+    expect(computeDayWindow(100, 10, -50, 50, 3)).toEqual({ first: 0, last: 8 })
+    // 範囲がすべて右外 → 末尾のみ
+    expect(computeDayWindow(100, 10, 5000, 6000, 0)).toEqual({
+      first: 99,
+      last: 99,
+    })
+  })
+
+  it('daysCount 0 / dayWidth 0 は空窓 { first: 0, last: -1 } を返す', () => {
+    expect(computeDayWindow(0, 10, 0, 100)).toEqual({ first: 0, last: -1 })
+    expect(computeDayWindow(100, 0, 0, 100)).toEqual({ first: 0, last: -1 })
   })
 })
 

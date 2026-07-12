@@ -28,6 +28,10 @@ export interface ToolbarProps {
   showCriticalPath: boolean
   /** クリティカルパス表示の ON/OFF を切り替える */
   onToggleCriticalPath: () => void
+  /** ガントを SVG 画像として書き出す */
+  onExportSvg: () => void
+  /** ガントを PNG 画像として書き出す */
+  onExportPng: () => void
   onTitleChange: (title: string) => void
   /** 新規作成(空の TaskSpec から始める) */
   onNew: () => void
@@ -60,6 +64,8 @@ function Toolbar(props: ToolbarProps) {
     onViewModeChange,
     showCriticalPath,
     onToggleCriticalPath,
+    onExportSvg,
+    onExportPng,
     onTitleChange,
     onNew,
     onSave,
@@ -176,6 +182,23 @@ function Toolbar(props: ToolbarProps) {
               title="クリティカルパス(余裕 0 のタスク鎖)を強調表示する"
             >
               クリティカルパス
+            </button>
+          </div>
+          <span className="toolbar-sep" aria-hidden="true" />
+          <div className="toolbar-actions">
+            <button
+              type="button"
+              onClick={onExportSvg}
+              title="ガントチャートを SVG 画像として書き出す"
+            >
+              SVG 書き出し
+            </button>
+            <button
+              type="button"
+              onClick={onExportPng}
+              title="ガントチャートを PNG 画像として書き出す"
+            >
+              PNG 書き出し
             </button>
           </div>
           <span className="toolbar-sep" aria-hidden="true" />

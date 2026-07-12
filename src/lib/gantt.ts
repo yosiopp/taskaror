@@ -348,6 +348,38 @@ function resolveToday(value: GanttLayoutOptions['today']): Date {
   return typeof value === 'string' ? parseDate(value) : value
 }
 
+// --- 日カラム仮想化のための窓計算(純粋関数) ---
+// 遠い未来日で days が巨大化しても、可視範囲に重なる日カラムだけを描けるよう、
+// 可視 X 範囲を days のインデックス窓に変換する。UI 側で座標計算を再発明しない。
+
+/** 仮想化で描画する日カラムのインデックス窓(両端 inclusive) */
+export interface DayWindow {
+  /** 描画する先頭 days インデックス(inclusive) */
+  first: number
+  /** 描画する末尾 days インデックス(inclusive)。first より小さければ空 */
+  last: number
+}
+
+/**
+ * 可視 X 範囲 [xStart, xEnd](ガント SVG ローカル座標)を、描画すべき
+ * 日カラムのインデックス窓に変換する。overscan は前後に足すバッファ(日カラム数)で、
+ * スクロール中の再計算遅れによる空白を防ぐ。窓は [0, daysCount-1] にクランプする。
+ * daysCount <= 0 / dayWidth <= 0 のときは空窓 { first: 0, last: -1 } を返す。
+ */
+export function computeDayWindow(
+  daysCount: number,
+  dayWidth: number,
+  xStart: number,
+  xEnd: number,
+  overscan = 0,
+): DayWindow {
+  if (daysCount <= 0 || dayWidth <= 0) return { first: 0, last: -1 }
+  const lastIndex = daysCount - 1
+  const first = clamp(Math.floor(xStart / dayWidth) - overscan, 0, lastIndex)
+  const last = clamp(Math.floor(xEnd / dayWidth) + overscan, first, lastIndex)
+  return { first, last }
+}
+
 // --- バードラッグ / キーボード操作のための座標↔日付変換(純粋関数) ---
 // UI(GanttChart)はここを呼ぶだけにして、日付計算を UI 側で再発明しない。
 

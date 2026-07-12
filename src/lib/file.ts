@@ -44,3 +44,15 @@ export function taskSpecFileName(spec: TaskSpec): string {
   const base = sanitizeFileBaseName(spec.info?.title ?? '')
   return `${base || DEFAULT_FILE_BASENAME}${FILE_EXTENSION}`
 }
+
+/**
+ * ガント画像のエクスポート用ファイル名 `<name>.<extension>` を導出する。
+ * name は taskSpecFileName と同じ規則(info.title から作り、無ければ既定名)。
+ */
+export function ganttImageFileName(
+  spec: TaskSpec,
+  extension: 'svg' | 'png',
+): string {
+  const base = sanitizeFileBaseName(spec.info?.title ?? '')
+  return `${base || DEFAULT_FILE_BASENAME}.${extension}`
+}

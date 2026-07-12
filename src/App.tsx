@@ -17,7 +17,14 @@ import YamlView from './components/YamlView'
 import WbsTable from './components/WbsTable'
 import LoadErrorNotice from './components/LoadError'
 import type { LoadError } from './components/LoadError'
-import { DAY_WIDTH, GRID_WIDTH, ROW_HEIGHT } from './components/constants'
+import {
+  DAY_WIDTH,
+  GANTT_DAY_OVERSCAN,
+  GRID_WIDTH,
+  HEADER_HEIGHT,
+  MONTH_BAND_HEIGHT,
+  ROW_HEIGHT,
+} from './components/constants'
 import {
   clampGridWidth,
   maxGridWidth,
@@ -32,12 +39,17 @@ import type {
 } from './lib/editor'
 import { canRedo, canUndo, initHistory, withHistory } from './lib/history'
 import { flattenTasks, parseTaskSpec, serializeTaskSpec } from './lib/taskspec'
-import { emptyTaskSpec, taskSpecFileName } from './lib/file'
+import { emptyTaskSpec, ganttImageFileName, taskSpecFileName } from './lib/file'
 import { validateTaskSpec } from './lib/validate'
 import { scheduleTasks } from './lib/schedule'
 import type { ScheduledTask } from './lib/schedule'
-import { computeGanttLayout, flattenScheduled } from './lib/gantt'
-import type { GanttLayout, GanttRow } from './lib/gantt'
+import {
+  computeDayWindow,
+  computeGanttLayout,
+  flattenScheduled,
+} from './lib/gantt'
+import type { DayWindow, GanttLayout, GanttRow } from './lib/gantt'
+import { renderGanttSvg } from './lib/ganttSvg'
 import { computeCriticalPath } from './lib/critical'
 import { formatDate, today as localToday } from './lib/date'
 import type { TaskSpec } from './types/taskspec'
@@ -178,9 +190,8 @@ function msUntilNextLocalMidnight(): number {
   return next.getTime() - now.getTime()
 }
 
-/** テキストをファイルとしてダウンロードさせる(ブラウザ専用) */
-function downloadText(text: string, fileName: string): void {
-  const blob = new Blob([text], { type: 'text/yaml;charset=utf-8' })
+/** Blob をファイルとしてダウンロードさせる(ブラウザ専用) */
+function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
@@ -189,6 +200,61 @@ function downloadText(text: string, fileName: string): void {
   anchor.click()
   anchor.remove()
   URL.revokeObjectURL(url)
+}
+
+/** テキストをファイルとしてダウンロードさせる(ブラウザ専用) */
+function downloadText(text: string, fileName: string): void {
+  downloadBlob(new Blob([text], { type: 'text/yaml;charset=utf-8' }), fileName)
+}
+
+/**
+ * SVG 文字列を PNG の Blob に変換する(canvas 経由。ブラウザ専用)。
+ * devicePixelRatio で高解像度化する(メモリ過大を避けるため上限 2 倍)。
+ * 画像サイズは SVG が持つ width/height から取得する。
+ */
+function ganttSvgToPngBlob(svgString: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    if (typeof document === 'undefined') {
+      reject(new Error('ブラウザ環境が必要です'))
+      return
+    }
+    const scale = Math.min(
+      typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1,
+      2,
+    )
+    const svgBlob = new Blob([svgString], {
+      type: 'image/svg+xml;charset=utf-8',
+    })
+    const url = URL.createObjectURL(svgBlob)
+    const image = new Image()
+    image.onload = (): void => {
+      const w = image.naturalWidth || image.width
+      const h = image.naturalHeight || image.height
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(w * scale))
+        canvas.height = Math.max(1, Math.round(h * scale))
+        const ctx = canvas.getContext('2d')
+        if (ctx === null)
+          throw new Error('canvas 2D コンテキストを取得できません')
+        ctx.scale(scale, scale)
+        ctx.drawImage(image, 0, 0)
+        canvas.toBlob((out) => {
+          URL.revokeObjectURL(url)
+          if (out) resolve(out)
+          else reject(new Error('PNG の生成に失敗しました'))
+        }, 'image/png')
+      } catch (thrown) {
+        URL.revokeObjectURL(url)
+        reject(thrown instanceof Error ? thrown : new Error(String(thrown)))
+      }
+    }
+    image.onerror = (): void => {
+      URL.revokeObjectURL(url)
+      reject(new Error('SVG の画像化に失敗しました'))
+    }
+    image.src = url
+  })
 }
 
 /** 破棄確認を出すべき「編集中の内容」があるか */
@@ -384,6 +450,68 @@ function App() {
     saveStoredGridWidth(width)
   }
 
+  // --- ガント日カラムの仮想化(可視範囲だけ描く) ---
+  // 共有スクロール容器(.editor-scroll)の scrollLeft と可視幅を追跡し、frozen な
+  // グリッド幅を差し引いたガント領域の可視 X 範囲を日インデックス窓に変換する。
+  // これで総期間が長くても、描く日カラムを viewport 相当に抑えられる。
+  const editorScrollRef = useRef<HTMLDivElement>(null)
+  const [scrollMetrics, setScrollMetrics] = useState<{
+    scrollLeft: number
+    clientWidth: number
+  }>(() => ({
+    scrollLeft: 0,
+    // 初回レンダーでも概ね正しい窓を出せるよう、ウィンドウ幅で近似する(SSR は 0)。
+    clientWidth: typeof window === 'undefined' ? 0 : window.innerWidth,
+  }))
+
+  // スクロール容器の scrollLeft / clientWidth を onScroll + ResizeObserver で追跡する。
+  // 更新は rAF スロットルし、値が変わったときだけ state を更新して再描画を抑える。
+  useEffect(() => {
+    const element = editorScrollRef.current
+    if (element === null) return
+    let frame = 0
+    const measure = (): void => {
+      frame = 0
+      setScrollMetrics((prev) =>
+        prev.scrollLeft === element.scrollLeft &&
+        prev.clientWidth === element.clientWidth
+          ? prev
+          : {
+              scrollLeft: element.scrollLeft,
+              clientWidth: element.clientWidth,
+            },
+      )
+    }
+    const schedule = (): void => {
+      if (frame === 0) frame = requestAnimationFrame(measure)
+    }
+    measure() // 初期計測(マウント直後・ビュー切り替え直後)
+    element.addEventListener('scroll', schedule, { passive: true })
+    const observer = new ResizeObserver(schedule)
+    observer.observe(element)
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame)
+      element.removeEventListener('scroll', schedule)
+      observer.disconnect()
+    }
+  }, [viewMode])
+
+  // 可視 X 範囲 → 日インデックス窓(オーバースキャン付き)。clientWidth 未計測(0)の
+  // 間はフル描画にフォールバックする(SSR など)。
+  const dayWindow = useMemo<DayWindow | null>(() => {
+    if (scrollMetrics.clientWidth <= 0) return null
+    const ganttViewport = Math.max(0, scrollMetrics.clientWidth - gridWidth)
+    const xStart = scrollMetrics.scrollLeft
+    const xEnd = scrollMetrics.scrollLeft + ganttViewport
+    return computeDayWindow(
+      layout.days.length,
+      layout.dayWidth,
+      xStart,
+      xEnd,
+      GANTT_DAY_OVERSCAN,
+    )
+  }, [scrollMetrics, gridWidth, layout.days.length, layout.dayWidth])
+
   // --- 編集ハンドラ ---
   const handleAdd = (): void => {
     const task = newTask(spec)
@@ -455,6 +583,52 @@ function App() {
 
   const handleSave = (): void => {
     downloadText(serializeTaskSpec(spec), taskSpecFileName(spec))
+  }
+
+  // --- エクスポート(SVG / PNG) ---
+  // 生成/ダウンロード失敗をユーザーに知らせるための一時メッセージ(数秒で自動的に消す)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (exportError === null) return
+    const timer = setTimeout(() => setExportError(null), 6000)
+    return () => clearTimeout(timer)
+  }, [exportError])
+
+  // エクスポートは可視窓(仮想化)に依存せず、全期間(layout の全 days)を出力する。
+  const buildGanttSvg = (): string =>
+    renderGanttSvg(
+      layout,
+      visibleRows.map((row) => ({
+        id: row.scheduled.task.id,
+        depth: row.depth,
+      })),
+      { headerHeight: HEADER_HEIGHT, monthBandHeight: MONTH_BAND_HEIGHT },
+    )
+
+  const handleExportSvg = (): void => {
+    try {
+      const svg = buildGanttSvg()
+      downloadBlob(
+        new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }),
+        ganttImageFileName(spec, 'svg'),
+      )
+    } catch {
+      setExportError('SVG の書き出しに失敗しました')
+    }
+  }
+
+  const handleExportPng = (): void => {
+    let svg: string
+    try {
+      svg = buildGanttSvg()
+    } catch {
+      setExportError('PNG の書き出しに失敗しました')
+      return
+    }
+    ganttSvgToPngBlob(svg)
+      .then((blob) => downloadBlob(blob, ganttImageFileName(spec, 'png')))
+      .catch(() => setExportError('PNG の書き出しに失敗しました'))
   }
 
   /** 読み込んだテキストをパース・検証し、問題なければ spec を置き換える */
@@ -543,6 +717,8 @@ function App() {
         onViewModeChange={setViewMode}
         showCriticalPath={showCriticalPath}
         onToggleCriticalPath={() => setShowCriticalPath((on) => !on)}
+        onExportSvg={handleExportSvg}
+        onExportPng={handleExportPng}
         onTitleChange={(title) => dispatch({ type: 'setInfoTitle', title })}
         onNew={handleNew}
         onSave={handleSave}
@@ -570,11 +746,17 @@ function App() {
         </div>
       ) : null}
 
+      {exportError !== null ? (
+        <div className="app-error" role="alert">
+          {exportError}
+        </div>
+      ) : null}
+
       {viewMode === 'gantt' ? (
         <div className="app-body" ref={appBodyRef}>
           {/* 唯一の縦横スクロール容器。左グリッドと右ガントを同じ容器に入れ、
               グリッドは横スクロール時に左端へ固定(sticky)することで行を常に一致させる */}
-          <div className="editor-scroll">
+          <div className="editor-scroll" ref={editorScrollRef}>
             <TaskGrid
               visibleRows={visibleRows}
               allTasks={allTasks}
@@ -587,6 +769,7 @@ function App() {
             />
             <GanttChart
               layout={layout}
+              dayWindow={dayWindow}
               selectedId={selectedId}
               criticalIds={criticalIds}
               showCritical={showCriticalPath}

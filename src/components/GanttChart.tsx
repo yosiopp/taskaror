@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
-import type { GanttLayout, GanttRowLayout } from '../lib/gantt'
+import type { DayWindow, GanttLayout, GanttRowLayout } from '../lib/gantt'
 import {
   estimateFromRange,
   pxToDayDelta,
@@ -19,6 +19,12 @@ import { HEADER_HEIGHT, MONTH_BAND_HEIGHT } from './constants'
 
 export interface GanttChartProps {
   layout: GanttLayout
+  /**
+   * 描画する日カラムのインデックス窓(仮想化)。可視範囲に重なる日カラム・月ラベル
+   * だけを描く。null / 未指定なら全日カラムを描く(SSR・初期化直後のフォールバック)。
+   * バー・矢印・行罫線・今日線は常に全描画(タスク数で有界)。
+   */
+  dayWindow?: DayWindow | null
   /** 選択中タスク id(該当バーを強調) */
   selectedId: string | null
   /** クリティカルパス上のタスク id 集合(該当バー・矢印を強調) */
@@ -36,6 +42,7 @@ const DAY_BAND_HEIGHT = HEADER_HEIGHT - MONTH_BAND_HEIGHT
 function GanttChart(props: GanttChartProps) {
   const {
     layout,
+    dayWindow,
     selectedId,
     criticalIds,
     showCritical,
@@ -55,13 +62,26 @@ function GanttChart(props: GanttChartProps) {
     )
   }
 
+  // 仮想化: 可視窓が指定されていればその範囲の日カラム・月ラベルだけを描く。
+  // 窓が無ければ全日カラムを描く(バー・矢印・行罫線・今日線は常に全描画)。
+  const { first, last } = dayWindow ?? {
+    first: 0,
+    last: layout.days.length - 1,
+  }
+  const visibleDays = layout.days.slice(first, last + 1)
+  const windowStartX = first * dayWidth
+  const windowEndX = (last + 1) * dayWidth
+  const visibleMonths = layout.months.filter(
+    (month) => month.x < windowEndX && month.x + month.width > windowStartX,
+  )
+
   return (
     <div className="gantt-col">
       <div className="gantt-inner" style={{ width }}>
         <div className="gantt-header" style={{ height: HEADER_HEIGHT }}>
           <svg width={width} height={HEADER_HEIGHT} role="presentation">
             {/* 週末シェード(日ラベル帯) */}
-            {layout.days.map((day) =>
+            {visibleDays.map((day) =>
               day.isWeekend ? (
                 <rect
                   key={`wh-${day.date}`}
@@ -73,8 +93,8 @@ function GanttChart(props: GanttChartProps) {
                 />
               ) : null,
             )}
-            {/* 月ラベル */}
-            {layout.months.map((month) => (
+            {/* 月ラベル(可視範囲に重なるものだけ) */}
+            {visibleMonths.map((month) => (
               <g key={`m-${month.label}`}>
                 <line
                   className="gantt-header-line"
@@ -93,7 +113,7 @@ function GanttChart(props: GanttChartProps) {
               </g>
             ))}
             {/* 日ラベル */}
-            {layout.days.map((day) => (
+            {visibleDays.map((day) => (
               <text
                 key={`d-${day.date}`}
                 className={
@@ -148,7 +168,7 @@ function GanttChart(props: GanttChartProps) {
           </defs>
 
           {/* 週末列のシェード */}
-          {layout.days.map((day) =>
+          {visibleDays.map((day) =>
             day.isWeekend ? (
               <rect
                 key={`w-${day.date}`}

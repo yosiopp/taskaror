@@ -3,6 +3,7 @@ import type { TaskSpec } from '../types/taskspec'
 import {
   DEFAULT_FILE_BASENAME,
   emptyTaskSpec,
+  ganttImageFileName,
   sanitizeFileBaseName,
   taskSpecFileName,
 } from './file'
@@ -55,5 +56,23 @@ describe('taskSpecFileName', () => {
     expect(taskSpecFileName({ ...base, info: { title: '??' } })).toBe(
       `${DEFAULT_FILE_BASENAME}.taskspec.yaml`,
     )
+  })
+})
+
+describe('ganttImageFileName', () => {
+  const base: TaskSpec = { taskspec: '1.0', tasks: [] }
+
+  it('info.title から <name>.<ext> を導出する', () => {
+    expect(
+      ganttImageFileName({ ...base, info: { title: 'ECサイト構築' } }, 'svg'),
+    ).toBe('ECサイト構築.svg')
+    expect(
+      ganttImageFileName({ ...base, info: { title: 'ECサイト構築' } }, 'png'),
+    ).toBe('ECサイト構築.png')
+  })
+
+  it('title が無ければ既定名を使う', () => {
+    expect(ganttImageFileName(base, 'svg')).toBe(`${DEFAULT_FILE_BASENAME}.svg`)
+    expect(ganttImageFileName(base, 'png')).toBe(`${DEFAULT_FILE_BASENAME}.png`)
   })
 })
