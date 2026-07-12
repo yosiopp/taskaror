@@ -21,7 +21,12 @@ import {
   parseStoredGridWidth,
 } from './components/paneWidth'
 import { editorReducer, newTask } from './lib/editor'
-import type { AddMode, EditorAction, TaskFields } from './lib/editor'
+import type {
+  AddMode,
+  DropPosition,
+  EditorAction,
+  TaskFields,
+} from './lib/editor'
 import { canRedo, canUndo, initHistory, withHistory } from './lib/history'
 import { flattenTasks, parseTaskSpec, serializeTaskSpec } from './lib/taskspec'
 import { emptyTaskSpec, taskSpecFileName } from './lib/file'
@@ -285,6 +290,16 @@ function App() {
     if (selectedId) dispatch({ type: 'moveTask', id: selectedId, direction })
   }
 
+  /** ドラッグ&ドロップでのタスク移動。移動後も当該タスクを選択状態に保つ */
+  const handleMoveTask = (
+    id: string,
+    targetId: string,
+    position: DropPosition,
+  ): void => {
+    dispatch({ type: 'moveTaskTo', id, targetId, position })
+    setSelectedId(id)
+  }
+
   const handleToggleCollapse = (id: string): void => {
     setCollapsedIds((prev) => {
       const next = new Set(prev)
@@ -438,6 +453,7 @@ function App() {
             onSelect={setSelectedId}
             onToggleCollapse={handleToggleCollapse}
             onUpdate={handleUpdate}
+            onMove={handleMoveTask}
           />
           <GanttChart
             layout={layout}

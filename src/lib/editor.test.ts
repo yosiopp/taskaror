@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { Task, TaskSpec } from '../types/taskspec'
 import {
+  collectAncestors,
   collectIds,
   editorReducer,
   generateTaskId,
+  moveTaskTo,
   newTask,
   type EditorAction,
 } from './editor'
+import { flattenTasks } from './taskspec'
 
 function spec(tasks: Task[]): TaskSpec {
   return { taskspec: '1.0', tasks }
@@ -246,6 +249,116 @@ describe('editorReducer: 並び替え', () => {
       direction: 'up',
     })
     expect(shape(next.tasks)).toBe('p(y,x)')
+  })
+})
+
+describe('editorReducer: moveTaskTo(ドラッグ移動)', () => {
+  const base = spec([
+    { id: 'a', title: 'A' },
+    {
+      id: 'b',
+      title: 'B',
+      tasks: [
+        { id: 'b1', title: 'B1' },
+        { id: 'b2', title: 'B2' },
+      ],
+    },
+    { id: 'c', title: 'C' },
+  ])
+
+  const move = (
+    from: TaskSpec,
+    id: string,
+    targetId: string,
+    position: 'before' | 'after' | 'child',
+  ): TaskSpec =>
+    editorReducer(from, { type: 'moveTaskTo', id, targetId, position })
+
+  it('対象の直前(兄弟)へ移動する', () => {
+    const next = move(base, 'c', 'a', 'before')
+    expect(shape(next.tasks)).toBe('c,a,b(b1,b2)')
+  })
+
+  it('対象の直後(兄弟)へ移動する', () => {
+    const next = move(base, 'a', 'c', 'after')
+    expect(shape(next.tasks)).toBe('b(b1,b2),c,a')
+  })
+
+  it('対象の子(末尾)へ移動してリペアレントする', () => {
+    const next = move(base, 'a', 'b', 'child')
+    expect(shape(next.tasks)).toBe('b(b1,b2,a),c')
+  })
+
+  it('別の親の子から別位置へ移動できる', () => {
+    const next = move(base, 'b1', 'a', 'after')
+    expect(shape(next.tasks)).toBe('a,b1,b(b2),c')
+  })
+
+  it('自分自身の子孫の中へは移動できない(無変更)', () => {
+    const next = move(base, 'b', 'b1', 'child')
+    expect(shape(next.tasks)).toBe('a,b(b1,b2),c')
+    // 無変更のときは元の配列参照をそのまま返す
+    expect(moveTaskTo(base.tasks, 'b', 'b1', 'child')).toBe(base.tasks)
+  })
+
+  it('自分自身への移動は無変更', () => {
+    const next = move(base, 'a', 'a', 'before')
+    expect(shape(next.tasks)).toBe('a,b(b1,b2),c')
+    expect(moveTaskTo(base.tasks, 'a', 'a', 'before')).toBe(base.tasks)
+  })
+
+  it('depends 参照は移動後も保持される', () => {
+    const withDeps = spec([
+      { id: 'a', title: 'A' },
+      { id: 'b', title: 'B', depends: ['a'] },
+      { id: 'c', title: 'C' },
+    ])
+    const next = move(withDeps, 'b', 'c', 'after')
+    expect(shape(next.tasks)).toBe('a,c,b')
+    expect(next.tasks.find((t) => t.id === 'b')?.depends).toEqual(['a'])
+  })
+
+  it('純粋関数 moveTaskTo は元の配列を破壊しない', () => {
+    const tasks = base.tasks
+    const before = shape(tasks)
+    moveTaskTo(tasks, 'a', 'c', 'after')
+    expect(shape(tasks)).toBe(before)
+  })
+})
+
+describe('collectAncestors', () => {
+  const tree: Task[] = [
+    {
+      id: 'a',
+      title: 'A',
+      tasks: [
+        {
+          id: 'a1',
+          title: 'A1',
+          tasks: [{ id: 'a1x', title: 'A1X' }],
+        },
+        { id: 'a2', title: 'A2' },
+      ],
+    },
+    { id: 'b', title: 'B' },
+  ]
+  const flat = flattenTasks(tree)
+
+  it('親〜ルートの id を集める', () => {
+    expect(collectAncestors(flat, 'a1x')).toEqual(new Set(['a', 'a1']))
+  })
+
+  it('直下の子の祖先は親のみ', () => {
+    expect(collectAncestors(flat, 'a2')).toEqual(new Set(['a']))
+  })
+
+  it('ルート要素に祖先はいない', () => {
+    expect(collectAncestors(flat, 'a')).toEqual(new Set())
+    expect(collectAncestors(flat, 'b')).toEqual(new Set())
+  })
+
+  it('存在しない id は空集合', () => {
+    expect(collectAncestors(flat, 'zzz')).toEqual(new Set())
   })
 })
 

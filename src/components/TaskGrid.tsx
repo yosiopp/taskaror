@@ -4,9 +4,10 @@
  * ガントと行を揃える。セルはインライン編集でき、コミットは updateTask を dispatch する。
  */
 import { useEffect, useRef, useState } from 'react'
-import type { ChangeEvent, KeyboardEvent, ReactElement } from 'react'
+import type { ChangeEvent, DragEvent, KeyboardEvent, ReactElement } from 'react'
 import type { GanttRow } from '../lib/gantt'
-import type { TaskFields } from '../lib/editor'
+import { collectAncestors } from '../lib/editor'
+import type { DropPosition, TaskFields } from '../lib/editor'
 import type { FlatTask } from '../lib/taskspec'
 import type { Task } from '../types/taskspec'
 import { GRID_COLUMNS, HEADER_HEIGHT, ROW_HEIGHT } from './constants'
@@ -41,6 +42,8 @@ export interface TaskGridProps {
   onSelect: (id: string) => void
   onToggleCollapse: (id: string) => void
   onUpdate: (id: string, changes: Partial<TaskFields>) => void
+  /** ドラッグ&ドロップで id を targetId の前/後/子へ移動する */
+  onMove: (id: string, targetId: string, position: DropPosition) => void
 }
 
 function TaskGrid(props: TaskGridProps) {
@@ -52,12 +55,21 @@ function TaskGrid(props: TaskGridProps) {
     onSelect,
     onToggleCollapse,
     onUpdate,
+    onMove,
   } = props
 
   const [editing, setEditing] = useState<EditingCell | null>(null)
   const [draft, setDraft] = useState('')
   // キーボード移動でセルを切り替える際、旧 input の blur による二重処理を防ぐ
   const suppressBlurRef = useRef(false)
+  // 本文コンテナ。↑/↓ でのフォーカス移動時の keydown 受けとスクロールに使う
+  const bodyRef = useRef<HTMLDivElement>(null)
+  // ドラッグ中のタスク id と、現在のドロップ先(挿入インジケータ用)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<{
+    id: string
+    position: DropPosition
+  } | null>(null)
 
   const startEdit = (id: string, field: EditableField, task: Task): void => {
     if (editing && editing.id === id && editing.field === field) return
@@ -122,6 +134,113 @@ function TaskGrid(props: TaskGridProps) {
     }
   }
 
+  // --- ↑/↓ での行フォーカス移動(本文コンテナで keydown を拾う) ---
+  const handleBodyKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (
+      event.key !== 'ArrowUp' &&
+      event.key !== 'ArrowDown' &&
+      event.key !== 'Enter'
+    ) {
+      return
+    }
+    // セル編集中・依存チェックボックス等の入力にフォーカスがあるときは
+    // 従来の Enter/Tab/Esc・入力操作を優先し、フォーカス移動と競合させない
+    if (editing !== null || isFormField(event.target)) return
+    if (visibleRows.length === 0) return
+
+    const currentIndex = visibleRows.findIndex(
+      (row) => row.scheduled.task.id === selectedId,
+    )
+
+    // Enter は選択行の名前セル編集を開始する
+    if (event.key === 'Enter') {
+      if (currentIndex === -1) return
+      event.preventDefault()
+      const task = visibleRows[currentIndex].scheduled.task
+      startEdit(task.id, 'title', task)
+      return
+    }
+
+    event.preventDefault()
+    let nextIndex: number
+    if (currentIndex === -1) {
+      nextIndex = event.key === 'ArrowDown' ? 0 : visibleRows.length - 1
+    } else {
+      nextIndex = currentIndex + (event.key === 'ArrowDown' ? 1 : -1)
+      if (nextIndex < 0 || nextIndex >= visibleRows.length) return // 端で止まる
+    }
+    onSelect(visibleRows[nextIndex].scheduled.task.id)
+    // 行が画面外なら可視化する(本文の直接の子 = 各行 div は visibleRows と同順)
+    const rowEl = bodyRef.current?.children[nextIndex]
+    rowEl?.scrollIntoView({ block: 'nearest' })
+  }
+
+  // --- ドラッグ&ドロップでのタスク移動 ---
+  const handleDragStart = (event: DragEvent<HTMLElement>, id: string): void => {
+    setDragId(id)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', id)
+    // グリップだけだと分かりにくいので、ドラッグ画像を行全体にする
+    const rowEl = event.currentTarget.closest('.grid-row')
+    if (rowEl instanceof HTMLElement) {
+      event.dataTransfer.setDragImage(rowEl, 12, 12)
+    }
+  }
+
+  const handleDragEnd = (): void => {
+    setDragId(null)
+    setDropTarget(null)
+  }
+
+  /**
+   * 行内のドロップ位置を判定する。上寄り=直前 / 下寄り=直後(いずれも兄弟)、
+   * 中央=子(リペアレント)。自分自身・子孫の中へは移動不可で null を返す。
+   */
+  const dropPositionFor = (
+    event: DragEvent<HTMLDivElement>,
+    targetId: string,
+  ): DropPosition | null => {
+    if (dragId === null || dragId === targetId) return null
+    if (collectSelfAndDescendants(allTasks, dragId).has(targetId)) return null
+    const rect = event.currentTarget.getBoundingClientRect()
+    const ratio = (event.clientY - rect.top) / rect.height
+    if (ratio < 0.3) return 'before'
+    if (ratio > 0.7) return 'after'
+    return 'child'
+  }
+
+  const handleRowDragOver = (
+    event: DragEvent<HTMLDivElement>,
+    targetId: string,
+  ): void => {
+    // 内部ドラッグでないとき(ファイル読み込み等)は App 側に委ねる
+    if (dragId === null) return
+    const position = dropPositionFor(event, targetId)
+    if (position === null) {
+      event.dataTransfer.dropEffect = 'none'
+      if (dropTarget !== null) setDropTarget(null)
+      return
+    }
+    event.preventDefault() // drop を許可するために必要
+    event.dataTransfer.dropEffect = 'move'
+    if (dropTarget?.id !== targetId || dropTarget.position !== position) {
+      setDropTarget({ id: targetId, position })
+    }
+  }
+
+  const handleRowDrop = (
+    event: DragEvent<HTMLDivElement>,
+    targetId: string,
+  ): void => {
+    if (dragId === null) return
+    const position = dropPositionFor(event, targetId)
+    event.preventDefault()
+    const moving = dragId
+    setDragId(null)
+    setDropTarget(null)
+    if (position !== null) onMove(moving, targetId, position)
+  }
+
   const renderInput = (field: EditableField): ReactElement => {
     const common = {
       className: 'grid-input',
@@ -168,22 +287,42 @@ function TaskGrid(props: TaskGridProps) {
         <span className="grid-th">依存</span>
       </div>
 
-      <div className="grid-body">
+      <div
+        className="grid-body"
+        ref={bodyRef}
+        tabIndex={0}
+        onKeyDown={handleBodyKeyDown}
+      >
         {visibleRows.map((row) => {
           const task = row.scheduled.task
           const selected = task.id === selectedId
+          const dropClass =
+            dropTarget?.id === task.id ? ` drop-${dropTarget.position}` : ''
           return (
             <div
               key={task.id}
-              className={`grid-row${selected ? ' selected' : ''}`}
+              className={`grid-row${selected ? ' selected' : ''}${dropClass}`}
               style={{ height: ROW_HEIGHT, gridTemplateColumns: GRID_COLUMNS }}
               onClick={() => onSelect(task.id)}
+              onDragOver={(event) => handleRowDragOver(event, task.id)}
+              onDrop={(event) => handleRowDrop(event, task.id)}
             >
-              {/* タスク名(インデント + 展開折りたたみ + 名称編集) */}
+              {/* タスク名(グリップ + インデント + 展開折りたたみ + 名称編集) */}
               <div
                 className="grid-cell cell-name"
                 style={{ paddingLeft: 6 + row.depth * 16 }}
               >
+                <span
+                  className="drag-handle"
+                  draggable
+                  role="button"
+                  aria-label="ドラッグして移動"
+                  title="ドラッグして移動"
+                  onDragStart={(event) => handleDragStart(event, task.id)}
+                  onDragEnd={handleDragEnd}
+                >
+                  ⠿
+                </span>
                 {row.hasChildren ? (
                   <button
                     type="button"
@@ -331,9 +470,13 @@ function DependsEditor({ task, allTasks, onChange }: DependsEditorProps) {
     }
   }, [open])
 
-  // 自分自身とその子孫は依存先にできないので除外する
+  // 自分自身・子孫に加えて祖先も依存先にできない(子が親/先祖に依存する
+  // 論理的循環を防ぐ)ので除外する
   const excluded = collectSelfAndDescendants(allTasks, task.id)
-  const options = allTasks.filter((flat) => !excluded.has(flat.task.id))
+  const ancestors = collectAncestors(allTasks, task.id)
+  const options = allTasks.filter(
+    (flat) => !excluded.has(flat.task.id) && !ancestors.has(flat.task.id),
+  )
 
   const toggleOpen = (): void => {
     if (open) {
@@ -404,6 +547,13 @@ function DependsEditor({ task, allTasks, onChange }: DependsEditorProps) {
 }
 
 // --- ヘルパー ---
+
+/** イベントの発火元が入力系要素(input / textarea / select)か */
+function isFormField(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+}
 
 /** 表示用にタスクのフィールド値を文字列化する(編集開始時の初期値) */
 function fieldToString(task: Task, field: EditableField): string {

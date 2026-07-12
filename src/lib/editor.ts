@@ -4,6 +4,7 @@
  * すべての操作は不変更新で新しい TaskSpec を返す。
  */
 import type { Task, TaskSpec } from '../types/taskspec'
+import type { FlatTask } from './taskspec'
 
 /** 編集可能なフィールド(導出値は含めない) */
 export interface TaskFields {
@@ -19,6 +20,9 @@ export interface TaskFields {
 
 export type AddMode = 'root-append' | 'child' | 'sibling-after'
 
+/** ドラッグ&ドロップの落とし先。対象タスクの直前・直後(兄弟)/ 子として */
+export type DropPosition = 'before' | 'after' | 'child'
+
 export type EditorAction =
   | { type: 'addTask'; task: Task; mode: AddMode; targetId?: string }
   | { type: 'removeTask'; id: string }
@@ -26,6 +30,12 @@ export type EditorAction =
   | { type: 'indentTask'; id: string }
   | { type: 'outdentTask'; id: string }
   | { type: 'moveTask'; id: string; direction: 'up' | 'down' }
+  | {
+      type: 'moveTaskTo'
+      id: string
+      targetId: string
+      position: DropPosition
+    }
   | { type: 'setInfoTitle'; title: string }
   | { type: 'replaceSpec'; spec: TaskSpec }
 
@@ -51,6 +61,11 @@ export function editorReducer(spec: TaskSpec, action: EditorAction): TaskSpec {
       return withTasks(spec, outdentTask(spec.tasks, action.id) ?? spec.tasks)
     case 'moveTask':
       return withTasks(spec, moveTask(spec.tasks, action.id, action.direction))
+    case 'moveTaskTo':
+      return withTasks(
+        spec,
+        moveTaskTo(spec.tasks, action.id, action.targetId, action.position),
+      )
     case 'setInfoTitle':
       return setInfoTitle(spec, action.title)
   }
@@ -210,6 +225,67 @@ function moveTask(tasks: Task[], id: string, direction: 'up' | 'down'): Task[] {
       return copy
     }) ?? tasks
   )
+}
+
+/**
+ * ドラッグ&ドロップでタスクを木構造の別位置へ移動する(純粋関数)。
+ * position に応じて対象タスクの直前・直後(兄弟)、または子として差し込む。
+ * 自分自身やその子孫の中へは移動できず(循環になるため)、その場合は無変更で返す。
+ * タスクは丸ごと移動するので depends 参照(全 id が存続)は壊れない。
+ */
+export function moveTaskTo(
+  tasks: Task[],
+  id: string,
+  targetId: string,
+  position: DropPosition,
+): Task[] {
+  const moving = findTask(tasks, id)
+  if (moving === undefined) return tasks
+  // 自分自身・子孫の中(= moving の部分木)へは移動できない
+  if (collectIds([moving]).has(targetId)) return tasks
+
+  // まず現在位置から切り離す(targetId は moving の外なので detached に残る)
+  const detached = transformSiblings(tasks, id, (siblings, index) =>
+    siblings.filter((_, i) => i !== index),
+  )
+  if (detached === null) return tasks
+
+  if (position === 'child') {
+    return mapTask(detached, targetId, (parent) => ({
+      ...parent,
+      tasks: [...(parent.tasks ?? []), moving],
+    }))
+  }
+
+  const offset = position === 'before' ? 0 : 1
+  const inserted = transformSiblings(detached, targetId, (siblings, index) => {
+    const copy = siblings.slice()
+    copy.splice(index + offset, 0, moving)
+    return copy
+  })
+  return inserted ?? tasks
+}
+
+/**
+ * 平坦化済みタスク列(深さ付き)から、指定 id の祖先(親〜ルート)の id 集合を返す。
+ * 子が親・先祖に依存する論理的循環を防ぐため、依存エディタの選択肢除外に使う。
+ */
+export function collectAncestors(
+  allTasks: FlatTask[],
+  id: string,
+): Set<string> {
+  const result = new Set<string>()
+  const index = allTasks.findIndex((flat) => flat.task.id === id)
+  if (index === -1) return result
+  // 表示順(深さ優先)では、自分より前で深さが浅くなるたびに祖先が 1 段見つかる
+  let depth = allTasks[index].depth
+  for (let i = index - 1; i >= 0 && depth > 0; i -= 1) {
+    if (allTasks[i].depth < depth) {
+      result.add(allTasks[i].task.id)
+      depth = allTasks[i].depth
+    }
+  }
+  return result
 }
 
 // --- フィールド編集 ---
