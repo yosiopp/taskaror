@@ -5,11 +5,25 @@
 import { useRef } from 'react'
 import type { ChangeEvent } from 'react'
 
+/** 本文のビューモード(ガント編集 / YAML テキスト / WBS 表) */
+export type ViewMode = 'gantt' | 'yaml' | 'wbs'
+
+/** 切り替えタブの定義(表示順) */
+const VIEW_TABS: { mode: ViewMode; label: string }[] = [
+  { mode: 'gantt', label: 'ガント編集' },
+  { mode: 'yaml', label: 'YAML' },
+  { mode: 'wbs', label: 'WBS表' },
+]
+
 export interface ToolbarProps {
   /** プロジェクトタイトル(spec.info?.title) */
   title: string
   /** 選択中タスク id(未選択なら null) */
   selectedId: string | null
+  /** 現在のビューモード */
+  viewMode: ViewMode
+  /** ビューモードの切り替え */
+  onViewModeChange: (mode: ViewMode) => void
   onTitleChange: (title: string) => void
   /** 新規作成(空の TaskSpec から始める) */
   onNew: () => void
@@ -38,6 +52,8 @@ function Toolbar(props: ToolbarProps) {
   const {
     title,
     selectedId,
+    viewMode,
+    onViewModeChange,
     onTitleChange,
     onNew,
     onSave,
@@ -86,6 +102,22 @@ function Toolbar(props: ToolbarProps) {
         aria-label="プロジェクト名"
         onChange={handleTitle}
       />
+      <span className="toolbar-sep" aria-hidden="true" />
+      <div className="toolbar-views" role="tablist" aria-label="ビュー切り替え">
+        {VIEW_TABS.map(({ mode, label }) => (
+          <button
+            key={mode}
+            type="button"
+            role="tab"
+            aria-selected={viewMode === mode}
+            className={viewMode === mode ? 'active' : undefined}
+            onClick={() => onViewModeChange(mode)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <span className="toolbar-sep" aria-hidden="true" />
       <div className="toolbar-actions">
         <button type="button" onClick={onNew}>
           新規
@@ -125,47 +157,52 @@ function Toolbar(props: ToolbarProps) {
           ↷
         </button>
       </div>
-      <span className="toolbar-sep" aria-hidden="true" />
-      <div className="toolbar-actions">
-        <button type="button" onClick={onAdd}>
-          ＋ タスク
-        </button>
-        <button type="button" onClick={onAddChild} disabled={noSelection}>
-          ＋ 子タスク
-        </button>
-        <button
-          type="button"
-          className="danger"
-          onClick={onRemove}
-          disabled={noSelection}
-        >
-          削除
-        </button>
-        <span className="toolbar-sep" aria-hidden="true" />
-        <button type="button" onClick={onOutdent} disabled={noSelection}>
-          ← アウトデント
-        </button>
-        <button type="button" onClick={onIndent} disabled={noSelection}>
-          インデント →
-        </button>
-        <span className="toolbar-sep" aria-hidden="true" />
-        <button
-          type="button"
-          onClick={onMoveUp}
-          disabled={noSelection}
-          aria-label="上へ移動"
-        >
-          ↑
-        </button>
-        <button
-          type="button"
-          onClick={onMoveDown}
-          disabled={noSelection}
-          aria-label="下へ移動"
-        >
-          ↓
-        </button>
-      </div>
+      {/* タスク編集操作はガント編集ビューの選択タスクに作用するため、そのビューでのみ表示する */}
+      {viewMode === 'gantt' ? (
+        <>
+          <span className="toolbar-sep" aria-hidden="true" />
+          <div className="toolbar-actions">
+            <button type="button" onClick={onAdd}>
+              ＋ タスク
+            </button>
+            <button type="button" onClick={onAddChild} disabled={noSelection}>
+              ＋ 子タスク
+            </button>
+            <button
+              type="button"
+              className="danger"
+              onClick={onRemove}
+              disabled={noSelection}
+            >
+              削除
+            </button>
+            <span className="toolbar-sep" aria-hidden="true" />
+            <button type="button" onClick={onOutdent} disabled={noSelection}>
+              ← アウトデント
+            </button>
+            <button type="button" onClick={onIndent} disabled={noSelection}>
+              インデント →
+            </button>
+            <span className="toolbar-sep" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={noSelection}
+              aria-label="上へ移動"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={noSelection}
+              aria-label="下へ移動"
+            >
+              ↓
+            </button>
+          </div>
+        </>
+      ) : null}
     </header>
   )
 }

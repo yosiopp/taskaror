@@ -71,8 +71,8 @@
 - [x] Undo / Redo
 - [x] バーのドラッグによる start・estimate の変更
 - [ ] 読み込んだ YAML の忠実性(コメント・キー順・引用符スタイルの保持。yaml の Document API を検討)
-- [ ] YAML テキストエディタビュー(CodeMirror 等。GUI との切り替え or 分割表示)
-- [ ] WBS 番号付きテーブルビュー
+- [x] YAML テキストエディタビュー(GUI との切り替え。素の textarea + 適用/破棄。CodeMirror 等のハイライトは将来対応)
+- [x] WBS 番号付きテーブルビュー(WBS 番号は `src/lib/wbs.ts` の `computeWbs` で導出。開始・終了は scheduleTasks を再利用)
 - [ ] クリティカルパスのハイライト
 - [ ] エクスポート(SVG、PNG)
 - [ ] ガント日カラムの仮想化 / 表示範囲制限(遠い未来日で SVG ノードが増えすぎるのを防ぐ)

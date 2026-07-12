@@ -118,6 +118,38 @@
   margin: 0 0.15rem;
 }
 
+/* --- ビュー切り替えタブ(ガント編集 / YAML / WBS表) --- */
+.toolbar-views {
+  display: inline-flex;
+  gap: 0.15rem;
+  padding: 0.15rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* .toolbar button より後に定義して同スコアで上書きする(枠なしのタブ表示にする) */
+.toolbar-views button {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.toolbar-views button:hover:not(.active) {
+  color: var(--text);
+  border-color: transparent;
+}
+
+.toolbar-views button.active {
+  color: var(--text);
+  background: var(--surface-alt);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
 /* --- エラーバナー --- */
 .app-error {
   padding: 0.5rem 0.75rem;
@@ -646,4 +678,142 @@ body.is-gantt-resizing * {
 
 .gantt-arrowhead {
   fill: var(--arrow);
+}
+
+/* --- YAML テキストエディタビュー --- */
+.yaml-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.yaml-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+  flex-wrap: wrap;
+}
+
+.yaml-toolbar button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.yaml-toolbar button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.yaml-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.yaml-toolbar button.primary {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.yaml-toolbar button.primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.yaml-dirty {
+  font-size: 0.75rem;
+  color: var(--gantt-today);
+}
+
+.yaml-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* 等幅・折り返しなし(横スクロール)・十分な高さのテキストエリア */
+.yaml-textarea {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface);
+  border: none;
+  outline: none;
+  resize: none;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+
+/* --- WBS 番号付きテーブルビュー --- */
+.wbs-view {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--surface);
+}
+
+.wbs-empty {
+  flex: 1;
+  padding: 1rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.wbs-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.8125rem;
+}
+
+.wbs-table th,
+.wbs-table td {
+  padding: 0.3rem 0.6rem;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--gantt-rowline);
+}
+
+/* 見出しは縦スクロールしても上部に固定する */
+.wbs-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.wbs-table tbody tr:hover {
+  background: var(--row-hover);
+}
+
+.wbs-num {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  color: var(--text-muted);
+}
+
+/* タスク名は階層インデントを付けるため最低幅を確保する(インデントは padding-left) */
+.wbs-name {
+  min-width: 220px;
+  white-space: normal;
+}
+
+.wbs-muted {
+  color: var(--text-muted);
+  opacity: 0.6;
 }

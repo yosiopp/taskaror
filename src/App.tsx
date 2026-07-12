@@ -9,9 +9,12 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { DragEvent } from 'react'
 import sampleSource from '../examples/ecommerce.taskspec.yaml?raw'
 import Toolbar from './components/Toolbar'
+import type { ViewMode } from './components/Toolbar'
 import TaskGrid from './components/TaskGrid'
 import GanttChart from './components/GanttChart'
 import PaneSeparator from './components/PaneSeparator'
+import YamlView from './components/YamlView'
+import WbsTable from './components/WbsTable'
 import LoadErrorNotice from './components/LoadError'
 import type { LoadError } from './components/LoadError'
 import { DAY_WIDTH, GRID_WIDTH, ROW_HEIGHT } from './components/constants'
@@ -32,6 +35,7 @@ import { flattenTasks, parseTaskSpec, serializeTaskSpec } from './lib/taskspec'
 import { emptyTaskSpec, taskSpecFileName } from './lib/file'
 import { validateTaskSpec } from './lib/validate'
 import { scheduleTasks } from './lib/schedule'
+import type { ScheduledTask } from './lib/schedule'
 import { computeGanttLayout, flattenScheduled } from './lib/gantt'
 import type { GanttLayout, GanttRow } from './lib/gantt'
 import type { TaskSpec } from './types/taskspec'
@@ -39,6 +43,8 @@ import type { TaskSpec } from './types/taskspec'
 interface Derived {
   visibleRows: GanttRow[]
   layout: GanttLayout
+  /** スケジュール導出結果のツリー(WBS 表の開始・終了に使う) */
+  scheduled: ScheduledTask[]
 }
 
 const EMPTY_LAYOUT: GanttLayout = computeGanttLayout([], {
@@ -77,6 +83,35 @@ function saveStoredSpec(spec: TaskSpec): void {
   if (typeof localStorage === 'undefined') return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(spec))
+  } catch {
+    // 容量超過やプライベートモードでの失敗は無視する
+  }
+}
+
+/** ビューモードの保存キー */
+const VIEW_MODE_KEY = 'taskaror:viewMode'
+
+/** 妥当なビューモードか(localStorage 由来の値の検証に使う) */
+function isViewMode(value: unknown): value is ViewMode {
+  return value === 'gantt' || value === 'yaml' || value === 'wbs'
+}
+
+/** localStorage から保存済みのビューモードを復元する(未保存・不正なら 'gantt') */
+function loadViewMode(): ViewMode {
+  if (typeof localStorage === 'undefined') return 'gantt'
+  try {
+    const raw = localStorage.getItem(VIEW_MODE_KEY)
+    return isViewMode(raw) ? raw : 'gantt'
+  } catch {
+    return 'gantt'
+  }
+}
+
+/** ビューモードを localStorage に保存する(ブラウザ専用。失敗しても無視する) */
+function saveViewMode(mode: ViewMode): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(VIEW_MODE_KEY, mode)
   } catch {
     // 容量超過やプライベートモードでの失敗は無視する
   }
@@ -172,11 +207,18 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // ファイル読み込みの失敗内容(パース or 検証)。成功時・閉じたときは null
   const [loadError, setLoadError] = useState<LoadError | null>(null)
+  // 本文のビューモード(ガント編集 / YAML / WBS 表)
+  const [viewMode, setViewMode] = useState<ViewMode>(loadViewMode)
 
   // spec が変わるたびに localStorage へ保存する(リロードでの作業消失を防ぐ)
   useEffect(() => {
     saveStoredSpec(spec)
   }, [spec])
+
+  // ビューモードを localStorage に保存する(次回起動時に同じビューで開く)
+  useEffect(() => {
+    saveViewMode(viewMode)
+  }, [viewMode])
 
   // キーボードショートカット: Cmd/Ctrl+Z で undo、Cmd/Ctrl+Shift+Z・Ctrl+Y で redo。
   // 入力欄など編集要素にフォーカスがある間はブラウザ既定の undo を邪魔しない。
@@ -212,7 +254,7 @@ function App() {
         dayWidth: DAY_WIDTH,
         rowHeight: ROW_HEIGHT,
       })
-      return { ok: true, derived: { visibleRows: rows, layout } }
+      return { ok: true, derived: { visibleRows: rows, layout, scheduled } }
     } catch (thrown) {
       const message = thrown instanceof Error ? thrown.message : String(thrown)
       return { ok: false, error: message }
@@ -224,6 +266,7 @@ function App() {
   const [lastGood, setLastGood] = useState<Derived>({
     visibleRows: [],
     layout: EMPTY_LAYOUT,
+    scheduled: [],
   })
   if (computation.ok && computation.derived !== lastGood) {
     setLastGood(computation.derived)
@@ -414,6 +457,8 @@ function App() {
       <Toolbar
         title={spec.info?.title ?? ''}
         selectedId={selectedId}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         onTitleChange={(title) => dispatch({ type: 'setInfoTitle', title })}
         onNew={handleNew}
         onSave={handleSave}
@@ -441,34 +486,46 @@ function App() {
         </div>
       ) : null}
 
-      <div className="app-body" ref={appBodyRef}>
-        {/* 唯一の縦横スクロール容器。左グリッドと右ガントを同じ容器に入れ、
-            グリッドは横スクロール時に左端へ固定(sticky)することで行を常に一致させる */}
-        <div className="editor-scroll">
-          <TaskGrid
-            visibleRows={visibleRows}
-            allTasks={allTasks}
-            selectedId={selectedId}
+      {viewMode === 'gantt' ? (
+        <div className="app-body" ref={appBodyRef}>
+          {/* 唯一の縦横スクロール容器。左グリッドと右ガントを同じ容器に入れ、
+              グリッドは横スクロール時に左端へ固定(sticky)することで行を常に一致させる */}
+          <div className="editor-scroll">
+            <TaskGrid
+              visibleRows={visibleRows}
+              allTasks={allTasks}
+              selectedId={selectedId}
+              gridWidth={gridWidth}
+              onSelect={setSelectedId}
+              onToggleCollapse={handleToggleCollapse}
+              onUpdate={handleUpdate}
+              onMove={handleMoveTask}
+            />
+            <GanttChart
+              layout={layout}
+              selectedId={selectedId}
+              onSelectBar={setSelectedId}
+              onUpdateTask={handleUpdate}
+            />
+          </div>
+          <PaneSeparator
             gridWidth={gridWidth}
-            onSelect={setSelectedId}
-            onToggleCollapse={handleToggleCollapse}
-            onUpdate={handleUpdate}
-            onMove={handleMoveTask}
-          />
-          <GanttChart
-            layout={layout}
-            selectedId={selectedId}
-            onSelectBar={setSelectedId}
-            onUpdateTask={handleUpdate}
+            containerRef={appBodyRef}
+            onResize={setGridWidth}
+            onCommitWidth={commitGridWidth}
           />
         </div>
-        <PaneSeparator
-          gridWidth={gridWidth}
-          containerRef={appBodyRef}
-          onResize={setGridWidth}
-          onCommitWidth={commitGridWidth}
+      ) : viewMode === 'yaml' ? (
+        <YamlView
+          spec={spec}
+          onApply={(next) => {
+            dispatch({ type: 'replaceSpec', spec: next })
+            setSelectedId(null)
+          }}
         />
-      </div>
+      ) : (
+        <WbsTable spec={spec} scheduled={derived.scheduled} />
+      )}
 
       {dragActive ? (
         <div className="app-dropzone" aria-hidden="true">
