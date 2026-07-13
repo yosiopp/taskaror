@@ -6,6 +6,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: 'node',
+    // React コンポーネントの UI テスト(DOM 操作)を行うため jsdom を既定にする。
+    // 純粋ロジックの lib テストも jsdom 上で問題なく動く。
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
   },
 })
