@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { serveCommand } from './commands/serve'
+import { svgCommand } from './commands/svg'
 import { validateCommand } from './commands/validate'
 
 /** サブコマンド 1 件の定義 */
@@ -18,6 +19,7 @@ export interface Command {
 const commands: Record<string, Command> = {
   serve: serveCommand,
   validate: validateCommand,
+  svg: svgCommand,
 }
 
 /** 自パッケージのディレクトリを返す */

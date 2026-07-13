@@ -3,7 +3,7 @@
 TaskSpec は人の入力のみを保存し、開始日・終了日・期間などの導出値はレンダラーが計算する
 (Single Source of Truth)。この計算ルールをまとめる。実装は
 [packages/core/src/lib/schedule.ts](../packages/core/src/lib/schedule.ts) にあり、ブラウザ/React 非依存の純粋な
-TypeScript として書かれている(将来 CLI の SVG ガント出力でも再利用する)。
+TypeScript として書かれている(CLI の SVG ガント出力 `taskaror svg` でも再利用している)。
 
 ## 前提となる決めごと
 
