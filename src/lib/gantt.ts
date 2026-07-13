@@ -57,6 +57,28 @@ export function flattenScheduled(
   return rows
 }
 
+/**
+ * タスク削除後に選択を移す先の id を、削除前の表示行(visibleRows)から求める。
+ * 削除される部分木(自身+可視の子孫)の直後にある可視タスクを優先し(直下)、
+ * 無ければ部分木の直前の行(祖先または先行タスク。削除後も残る)を選ぶ(直上)。
+ * 対象が見つからない・唯一の行だった場合は null。
+ */
+export function nextSelectionAfterRemoval(
+  rows: GanttRow[],
+  removedId: string,
+): string | null {
+  const index = rows.findIndex((row) => row.scheduled.task.id === removedId)
+  if (index === -1) return null
+  const depth = rows[index].depth
+  // 直下: 部分木(depth より深い行=子孫)を飛ばした先の最初の可視タスク
+  for (let i = index + 1; i < rows.length; i += 1) {
+    if (rows[i].depth <= depth) return rows[i].scheduled.task.id
+  }
+  // 直上: 部分木の直前の行。子孫は必ず後ろに並ぶので、これは削除対象の外
+  if (index > 0) return rows[index - 1].scheduled.task.id
+  return null
+}
+
 export interface GanttLayoutOptions {
   /** 1 暦日あたりの px 幅 */
   dayWidth: number

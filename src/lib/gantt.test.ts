@@ -5,6 +5,7 @@ import {
   computeGanttLayout,
   estimateFromRange,
   flattenScheduled,
+  nextSelectionAfterRemoval,
   pxToDayDelta,
   shiftDateByBusinessDays,
   shiftDateByDays,
@@ -88,6 +89,52 @@ describe('flattenScheduled', () => {
     )
     const rows = flattenScheduled(roots, new Set(['a']))
     expect(rows[0].collapsed).toBe(false)
+  })
+})
+
+describe('nextSelectionAfterRemoval', () => {
+  const rows = (): GanttRow[] =>
+    flattenScheduled(
+      scheduleTasks(
+        spec([
+          {
+            id: 'p',
+            title: 'P',
+            tasks: [
+              { id: 'c1', title: 'C1', estimate: '1d' },
+              { id: 'c2', title: 'C2', estimate: '1d' },
+            ],
+          },
+          { id: 'q', title: 'Q', estimate: '1d' },
+        ]),
+        { today: TODAY },
+      ),
+    )
+  // 表示順: p, c1, c2, q
+
+  it('中間の行を消すと直下の可視タスクを選ぶ', () => {
+    expect(nextSelectionAfterRemoval(rows(), 'c1')).toBe('c2')
+  })
+
+  it('末尾の行を消すと直上の行を選ぶ', () => {
+    expect(nextSelectionAfterRemoval(rows(), 'q')).toBe('c2')
+  })
+
+  it('子を持つ親を消すと、部分木(子孫)を飛ばした直後を選ぶ', () => {
+    expect(nextSelectionAfterRemoval(rows(), 'p')).toBe('q')
+  })
+
+  it('唯一の行を消すと null', () => {
+    const only = flattenScheduled(
+      scheduleTasks(spec([{ id: 'a', title: 'A', estimate: '1d' }]), {
+        today: TODAY,
+      }),
+    )
+    expect(nextSelectionAfterRemoval(only, 'a')).toBeNull()
+  })
+
+  it('存在しない id は null', () => {
+    expect(nextSelectionAfterRemoval(rows(), 'zzz')).toBeNull()
   })
 })
 

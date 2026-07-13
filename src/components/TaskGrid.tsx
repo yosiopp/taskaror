@@ -102,7 +102,10 @@ function TaskGrid(props: TaskGridProps) {
       setEditing(next)
       setDraft(task ? fieldToString(task, next.field) : '')
     } else {
+      // これ以上移動先がない(端で確定した)場合は編集を終え、
+      // 行移動の ↑/↓ を再び受けられるようグリッド本体へフォーカスを戻す
       setEditing(null)
+      focusBody()
     }
     // 移動後に blur が発生しなかった場合に備え、抑制フラグを解除しておく
     window.setTimeout(() => {
@@ -110,9 +113,19 @@ function TaskGrid(props: TaskGridProps) {
     }, 0)
   }
 
+  /**
+   * グリッド本体へフォーカスを戻す。セル編集の input が unmount されると
+   * ↑/↓ を受ける .grid-body からフォーカスが外れて行移動できなくなるため、
+   * Esc / キーボードでの編集終了後に呼んで復帰させる。
+   */
+  const focusBody = (): void => {
+    bodyRef.current?.focus()
+  }
+
   const cancel = (): void => {
     suppressBlurRef.current = true
     setEditing(null)
+    focusBody()
     window.setTimeout(() => {
       suppressBlurRef.current = false
     }, 0)

@@ -49,6 +49,7 @@ import {
   computeDayWindow,
   computeGanttLayout,
   flattenScheduled,
+  nextSelectionAfterRemoval,
 } from './lib/gantt'
 import type { DayWindow, GanttLayout, GanttRow } from './lib/gantt'
 import { renderGanttSvg } from './lib/ganttSvg'
@@ -570,8 +571,10 @@ function App() {
 
   const handleRemove = (): void => {
     if (!selectedId) return
+    // 削除でフォーカス(選択)が消えないよう、削除前の表示行から移動先を決める
+    const nextSelected = nextSelectionAfterRemoval(visibleRows, selectedId)
     dispatch({ type: 'removeTask', id: selectedId })
-    setSelectedId(null)
+    setSelectedId(nextSelected)
   }
 
   const handleIndent = (): void => {
