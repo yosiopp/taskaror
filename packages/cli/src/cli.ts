@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { serveCommand } from './commands/serve'
 
 /** サブコマンド 1 件の定義 */
 export interface Command {
@@ -13,7 +14,9 @@ export interface Command {
 
 // サブコマンドのレジストリ(名前 → 定義)。
 // 後続のコマンド(validate / lint / svg など)はここに追記する。
-const commands: Record<string, Command> = {}
+const commands: Record<string, Command> = {
+  serve: serveCommand,
+}
 
 /** 自パッケージのディレクトリを返す */
 function ownDir(): string {

@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @taskaror/web",
-    "build": "tsc -b && npm run build -w @taskaror/web",
+    "build": "tsc -b && npm run build -w @taskaror/web && npm run build -w taskaror",
     "preview": "npm run preview -w @taskaror/web",
     "typecheck": "tsc -b",
     "test": "vitest run",

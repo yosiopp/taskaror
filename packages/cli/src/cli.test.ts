@@ -82,4 +82,10 @@ describe('usage', () => {
     expect(text).toContain('-h, --help')
     expect(text).toContain('-v, --version')
   })
+
+  it('登録済みコマンド(serve)の説明を含む', () => {
+    const text = usage()
+    expect(text).toContain('serve')
+    expect(text).toContain('ローカルサーバで配信')
+  })
 })
