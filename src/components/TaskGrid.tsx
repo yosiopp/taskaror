@@ -39,7 +39,8 @@ export interface TaskGridProps {
   selectedId: string | null
   /** グリッド列の幅(px)。セパレータのドラッグで変わる */
   gridWidth: number
-  onSelect: (id: string) => void
+  /** 行を選択する。空グリッド行へフォーカスを移すときは null で選択解除する */
+  onSelect: (id: string | null) => void
   onToggleCollapse: (id: string) => void
   onUpdate: (id: string, changes: Partial<TaskFields>) => void
   /** ドラッグ&ドロップで id を targetId の前/後/子へ移動する */
@@ -74,6 +75,8 @@ function TaskGrid(props: TaskGridProps) {
   const [editing, setEditing] = useState<EditingCell | null>(null)
   // 表示する空行数(スプレッドシート風。行追加 UI で増やす)
   const [emptyRows, setEmptyRows] = useState(INITIAL_EMPTY_ROWS)
+  // ↑/↓ で空グリッド行へ移したフォーカス位置(0 始まりの空行番号)。null は空行未フォーカス
+  const [emptyFocus, setEmptyFocus] = useState<number | null>(null)
   const [draft, setDraft] = useState('')
   // キーボード移動でセルを切り替える際、旧 input の blur による二重処理を防ぐ
   const suppressBlurRef = useRef(false)
@@ -86,6 +89,12 @@ function TaskGrid(props: TaskGridProps) {
     position: DropPosition
   } | null>(null)
 
+  // 実効的な空行フォーカス。空行フォーカスは「タスク未選択」のときだけ意味を持つ。
+  // こうすると、クリック選択・セル編集・グローバルショートカット(Insert 追加等)・
+  // ガント側の選択など、どの経路で selectedId が付いても空行の強調を自動で畳めて、
+  // 選択ハイライトの二重化を防げる(emptyFocus を都度リセットする副作用が要らない)。
+  const activeEmptyFocus = selectedId === null ? emptyFocus : null
+
   const startEdit = (id: string, field: EditableField, task: Task): void => {
     if (editing && editing.id === id && editing.field === field) return
     onSelect(id)
@@ -94,15 +103,21 @@ function TaskGrid(props: TaskGridProps) {
   }
 
   /**
-   * 空行クリック(スプレッドシート風の新規作成)。末尾にタスクを作り、
+   * 空行から新規タスクを作成する(スプレッドシート風)。末尾にタスクを作り、
    * 続けて名称を打てるよう名称セルの編集をすぐ開始する。
    * onCreateTask は id を同期に採番するので、次のレンダーで新規行が現れると
-   * その名称セルが入力状態で描画される。
+   * その名称セルが入力状態で描画される。initialTitle を渡すと、キー入力で
+   * 打ち始めた 1 文字を名称の初期値として引き継ぐ。
    */
-  const handleEmptyRowClick = (): void => {
+  const createTaskFromEmpty = (initialTitle?: string): void => {
     const task = onCreateTask()
     setEditing({ id: task.id, field: 'title' })
-    setDraft(task.title)
+    setDraft(initialTitle ?? task.title)
+  }
+
+  /** 空行クリックでの新規作成(名称の初期値は空のまま) */
+  const handleEmptyRowClick = (): void => {
+    createTaskFromEmpty()
   }
 
   /**
@@ -185,46 +200,103 @@ function TaskGrid(props: TaskGridProps) {
   }
 
   // --- ↑/↓ での行フォーカス移動(本文コンテナで keydown を拾う) ---
+  // タスク行と空グリッド行は本文の直接の子 div として visibleRows → 空行の順に
+  // 並ぶので、子インデックスはタスク行 = i、空行 = visibleRows.length + e で引ける。
+
+  /** index 番目のタスク行へフォーカス(選択)を移し、画面外なら可視化する */
+  const focusTaskRow = (index: number): void => {
+    setEmptyFocus(null)
+    onSelect(visibleRows[index].scheduled.task.id)
+    bodyRef.current?.children[index]?.scrollIntoView({ block: 'nearest' })
+  }
+
+  /** index 番目の空グリッド行へフォーカスを移す。タスク選択は解除する */
+  const focusEmptyRow = (index: number): void => {
+    onSelect(null)
+    setEmptyFocus(index)
+    bodyRef.current?.children[visibleRows.length + index]?.scrollIntoView({
+      block: 'nearest',
+    })
+  }
+
   const handleBodyKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (
-      event.key !== 'ArrowUp' &&
-      event.key !== 'ArrowDown' &&
-      event.key !== 'Enter'
-    ) {
-      return
-    }
+    const { key } = event
+    const isArrow = key === 'ArrowUp' || key === 'ArrowDown'
+    // 空行フォーカス時の新規作成トリガに使う「表示可能な 1 文字入力」か
+    // (修飾キー付きのショートカットは除外する)
+    const isPrintable =
+      key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey
+    if (!isArrow && key !== 'Enter' && !isPrintable) return
     // Ctrl/Cmd+矢印はグローバルのタスク上下移動に委ねる(行フォーカス移動はしない)
     if (event.ctrlKey || event.metaKey) return
     // セル編集中・依存チェックボックス等の入力にフォーカスがあるときは
     // 従来の Enter/Tab/Esc・入力操作を優先し、フォーカス移動と競合させない
     if (editing !== null || isFormField(event.target)) return
-    if (visibleRows.length === 0) return
 
-    const currentIndex = visibleRows.findIndex(
+    const taskCount = visibleRows.length
+    if (taskCount === 0 && emptyRows === 0) return
+
+    const emptyIndex = activeEmptyFocus
+    const taskIndex = visibleRows.findIndex(
       (row) => row.scheduled.task.id === selectedId,
     )
 
-    // Enter は選択行の名前セル編集を開始する
-    if (event.key === 'Enter') {
-      if (currentIndex === -1) return
-      event.preventDefault()
-      const task = visibleRows[currentIndex].scheduled.task
-      startEdit(task.id, 'title', task)
+    // Enter: タスク行なら名前セル編集を開始、空行なら新規タスクを作成する
+    if (key === 'Enter') {
+      if (emptyIndex !== null) {
+        event.preventDefault()
+        createTaskFromEmpty()
+      } else if (taskIndex !== -1) {
+        event.preventDefault()
+        const task = visibleRows[taskIndex].scheduled.task
+        startEdit(task.id, 'title', task)
+      }
       return
     }
 
-    event.preventDefault()
-    let nextIndex: number
-    if (currentIndex === -1) {
-      nextIndex = event.key === 'ArrowDown' ? 0 : visibleRows.length - 1
-    } else {
-      nextIndex = currentIndex + (event.key === 'ArrowDown' ? 1 : -1)
-      if (nextIndex < 0 || nextIndex >= visibleRows.length) return // 端で止まる
+    // 表示可能な 1 文字: 空行フォーカス時のみ、その文字を名称の初期値にして作成する。
+    // (IME 変換中の日本語入力は div では捕捉できないため、その場合は Enter で作成する)
+    if (isPrintable) {
+      if (emptyIndex === null) return
+      event.preventDefault()
+      createTaskFromEmpty(key)
+      return
     }
-    onSelect(visibleRows[nextIndex].scheduled.task.id)
-    // 行が画面外なら可視化する(本文の直接の子 = 各行 div は visibleRows と同順)
-    const rowEl = bodyRef.current?.children[nextIndex]
-    rowEl?.scrollIntoView({ block: 'nearest' })
+
+    // 以降は ↑/↓ の行フォーカス移動
+    event.preventDefault()
+    const down = key === 'ArrowDown'
+
+    if (emptyIndex !== null) {
+      // 空行内の移動。最上段の空行で ↑ を押すと末尾タスク行へ戻る
+      if (down) {
+        if (emptyIndex + 1 < emptyRows) focusEmptyRow(emptyIndex + 1)
+      } else if (emptyIndex > 0) {
+        focusEmptyRow(emptyIndex - 1)
+      } else if (taskCount > 0) {
+        focusTaskRow(taskCount - 1)
+      }
+      return
+    }
+
+    if (taskIndex === -1) {
+      // 未フォーカス: ↓ は先頭、↑ は末尾から入る(タスクが無ければ空行へ)
+      if (down) {
+        if (taskCount > 0) focusTaskRow(0)
+        else focusEmptyRow(0)
+      } else if (taskCount > 0) {
+        focusTaskRow(taskCount - 1)
+      }
+      return
+    }
+
+    // タスク行内の移動。末尾タスクで ↓ を押すと直下の空グリッド行へ移る
+    if (down) {
+      if (taskIndex + 1 < taskCount) focusTaskRow(taskIndex + 1)
+      else if (emptyRows > 0) focusEmptyRow(0)
+    } else if (taskIndex > 0) {
+      focusTaskRow(taskIndex - 1)
+    }
   }
 
   // --- ドラッグ&ドロップでのタスク移動 ---
@@ -441,11 +513,12 @@ function TaskGrid(props: TaskGridProps) {
           )
         })}
 
-        {/* 空行(スプレッドシート風)。クリックで末尾に新規タスクを作る */}
+        {/* 空行(スプレッドシート風)。クリック、または ↑/↓ でフォーカスして
+            文字入力/Enter で末尾に新規タスクを作る */}
         {Array.from({ length: emptyRows }, (_, i) => (
           <div
             key={`empty-${i}`}
-            className="grid-row grid-row-empty"
+            className={`grid-row grid-row-empty${activeEmptyFocus === i ? ' focused' : ''}`}
             style={{ height: ROW_HEIGHT, gridTemplateColumns: GRID_COLUMNS }}
             onClick={handleEmptyRowClick}
             title="クリックして新しいタスクを追加"

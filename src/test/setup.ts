@@ -24,3 +24,9 @@ class ResizeObserverStub {
 }
 globalThis.ResizeObserver ??=
   ResizeObserverStub as unknown as typeof ResizeObserver
+
+// jsdom は scrollIntoView を実装しないため、何もしないスタブを補う
+// (グリッドの行フォーカス移動が、対象行の可視化のために呼び出す)。
+if (typeof Element !== 'undefined') {
+  Element.prototype.scrollIntoView = function scrollIntoView(): void {}
+}

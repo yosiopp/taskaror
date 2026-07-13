@@ -162,4 +162,71 @@ describe('App の UI', () => {
     // 消えたわけではなく移動しただけ
     expect(screen.getByText('新しいタスク')).toBeInTheDocument()
   })
+
+  it('末尾タスク行で ↓ を押すと空グリッド行へフォーカスが移り、↑ で戻れる', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    // Insert で末尾に追加すると「新しいタスク」が最後の行かつ選択中になる
+    await user.keyboard('{Insert}')
+    expect(document.querySelector('.grid-row.selected')).not.toBeNull()
+
+    // グリッド本体にフォーカスを当ててから ↓ を押す
+    const body = document.querySelector('.grid-body') as HTMLElement
+    body.focus()
+    await user.keyboard('{ArrowDown}')
+
+    // 末尾タスクから直下の空グリッド行へフォーカスが移る(タスク選択は解除)
+    expect(document.querySelector('.grid-row-empty.focused')).not.toBeNull()
+    expect(document.querySelector('.grid-row.selected')).toBeNull()
+
+    // 空行の一番上で ↑ を押すと末尾タスク行へ戻る
+    await user.keyboard('{ArrowUp}')
+    expect(document.querySelector('.grid-row-empty.focused')).toBeNull()
+    const selected = document.querySelector('.grid-row.selected')
+    expect(selected?.querySelector('.cell-text.title')?.textContent).toBe(
+      '新しいタスク',
+    )
+  })
+
+  it('空グリッド行で Enter を押すと新規タスクが作成される', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const taskRowCount = (): number =>
+      document.querySelectorAll('.grid-row:not(.grid-row-empty)').length
+
+    // 末尾タスク → ↓ で空行へフォーカス
+    await user.keyboard('{Insert}')
+    const before = taskRowCount()
+    const body = document.querySelector('.grid-body') as HTMLElement
+    body.focus()
+    await user.keyboard('{ArrowDown}')
+    expect(document.querySelector('.grid-row-empty.focused')).not.toBeNull()
+
+    // 空行フォーカス状態で Enter → タスクが 1 つ増える
+    await user.keyboard('{Enter}')
+    expect(taskRowCount()).toBe(before + 1)
+  })
+
+  it('空グリッド行で文字入力すると、その文字を名称にして新規タスクが作成される', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const taskRowCount = (): number =>
+      document.querySelectorAll('.grid-row:not(.grid-row-empty)').length
+
+    // 末尾タスク → ↓ で空行へフォーカス
+    await user.keyboard('{Insert}')
+    const before = taskRowCount()
+    const body = document.querySelector('.grid-body') as HTMLElement
+    body.focus()
+    await user.keyboard('{ArrowDown}')
+    expect(document.querySelector('.grid-row-empty.focused')).not.toBeNull()
+
+    // 空行フォーカス状態で 'a' を打つと、その文字を初期値に名称編集が始まる
+    await user.keyboard('a')
+    expect(taskRowCount()).toBe(before + 1)
+    expect(screen.getByDisplayValue('a')).toBeInTheDocument()
+  })
 })

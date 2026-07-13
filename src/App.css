@@ -452,6 +452,11 @@ body.is-resizing-cols {
   background: var(--row-hover);
 }
 
+/* ↑/↓ でフォーカス中の空行。選択タスクと同じ強調で位置を示す */
+.grid-row-empty.focused {
+  background: var(--row-selected);
+}
+
 .grid-row-empty .grid-cell {
   cursor: cell;
 }
