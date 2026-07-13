@@ -90,8 +90,8 @@
 
 - [x] モノレポ構成へ移行する(npm workspaces。web と CLI を同一リポジトリに置く)
   - [x] コアロジック(React 非依存の lib 群)を共有パッケージに切り出し、web / CLI から参照できるようにする
-- [ ] CLI の基盤を作る(コマンド体系・引数設計。Node.js で実行し、npm の `bin` と Docker entrypoint の両方から呼べる形にする)
-  - [ ] npx 経由の実行を用意する(package.json の `bin` 定義。`npx taskaror <command>` で動く)
+- [x] CLI の基盤を作る(コマンド体系・引数設計。Node.js で実行し、npm の `bin` と Docker entrypoint の両方から呼べる形にする)
+  - [x] npx 経由の実行を用意する(package.json の `bin` 定義。`npx taskaror <command>` で動く)
   - [ ] Docker 経由の実行を用意する(`taskaror` を entrypoint にしたイメージ。`docker run` で動く)
 - [ ] serve コマンド(既存の静的 SPA をローカルサーバで配信。web は静的のまま=ファイル直編集なし。docker では `-p` でポート公開、マウント不要)
 - [ ] validator コマンド(schema 検証+構造検証。フェーズ 1 の実装を再利用。spec ファイルを引数で受ける)

@@ -1,0 +1,21 @@
+{
+  "name": "taskaror",
+  "version": "0.1.0",
+  "description": "TaskSpec(YAML ベースのタスク定義フォーマット)を編集・検証・可視化する CLI",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "taskaror": "dist/taskaror.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "@taskaror/core": "*",
+    "@types/node": "^24.13.3",
+    "esbuild": "^0.28.1"
+  }
+}

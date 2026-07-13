@@ -16,6 +16,13 @@ export default tseslint.config([
       ecmaVersion: 2023,
     },
   },
+  // packages/cli のみ: Node.js 上で動く CLI のため Node グローバルを許可
+  {
+    files: ['packages/cli/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
   // packages/web のみ: React 系プラグイン+ブラウザグローバル
   {
     files: ['packages/web/**/*.{ts,tsx}'],
