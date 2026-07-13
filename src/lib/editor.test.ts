@@ -27,18 +27,18 @@ function shape(tasks: Task[]): string {
 }
 
 describe('generateTaskId', () => {
-  it('t- + 英数字 4 文字を生成する', () => {
+  it('t + 英数字 3 文字を生成する', () => {
     const id = generateTaskId(new Set())
-    expect(id).toMatch(/^t-[a-z0-9]{4}$/)
+    expect(id).toMatch(/^t[a-z0-9]{3}$/)
   })
 
   it('衝突したら再生成する', () => {
-    // 最初の 4 回は 'a'(=> t-aaaa 衝突)、その後 'b' を返す乱数
-    const values = [0, 0, 0, 0, 0.05, 0.05, 0.05, 0.05]
+    // 最初の 3 回は 'a'(=> taaa 衝突)、その後 'b' を返す乱数
+    const values = [0, 0, 0, 0.05, 0.05, 0.05]
     let i = 0
     const random = () => values[i++] ?? 0.05
-    const id = generateTaskId(new Set(['t-aaaa']), random)
-    expect(id).toBe('t-bbbb')
+    const id = generateTaskId(new Set(['taaa']), random)
+    expect(id).toBe('tbbb')
   })
 })
 

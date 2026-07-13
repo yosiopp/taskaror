@@ -74,7 +74,7 @@ export function editorReducer(spec: TaskSpec, action: EditorAction): TaskSpec {
 // --- id 採番 ---
 
 const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789'
-const ID_LENGTH = 4
+const ID_LENGTH = 3
 const MAX_ID_ATTEMPTS = 1000
 
 /** 全階層のタスク id を集める */
@@ -91,8 +91,8 @@ export function collectIds(tasks: Task[]): Set<string> {
 }
 
 /**
- * 未使用のタスク id を生成する(`t-` + 英数字 4 文字。例: `t-a3f9`)。
- * 衝突したら再生成する(決めごと参照)。
+ * 未使用のタスク id を生成する(`t` + 英数字 3 文字。例: `ta3f`。`t[a-z0-9]{3}`)。
+ * 採番空間は 36^3 = 46,656 通り。衝突したら再生成する(決めごと参照)。
  */
 export function generateTaskId(
   existing: Set<string>,
@@ -103,7 +103,7 @@ export function generateTaskId(
     for (let i = 0; i < ID_LENGTH; i += 1) {
       suffix += ID_ALPHABET[Math.floor(random() * ID_ALPHABET.length)]
     }
-    const id = `t-${suffix}`
+    const id = `t${suffix}`
     if (!existing.has(id)) return id
   }
   throw new Error('タスク id の生成に失敗しました')
