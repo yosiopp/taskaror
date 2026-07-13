@@ -4,6 +4,7 @@ import {
   computeDayWindow,
   computeGanttLayout,
   estimateFromRange,
+  filterCompleted,
   flattenScheduled,
   nextSelectionAfterRemoval,
   pxToDayDelta,
@@ -89,6 +90,45 @@ describe('flattenScheduled', () => {
     )
     const rows = flattenScheduled(roots, new Set(['a']))
     expect(rows[0].collapsed).toBe(false)
+  })
+})
+
+describe('filterCompleted', () => {
+  it('progress === 100 のタスクとその子孫を落とす', () => {
+    const roots = scheduleTasks(
+      spec([
+        { id: 'a', title: 'A', estimate: '1d', progress: 100 },
+        { id: 'b', title: 'B', estimate: '1d', progress: 50 },
+        {
+          id: 'p',
+          title: 'P',
+          progress: 100,
+          tasks: [{ id: 'c', title: 'C', estimate: '1d' }],
+        },
+      ]),
+      { today: TODAY },
+    )
+    const kept = filterCompleted(roots)
+    expect(kept.map((n) => n.task.id)).toEqual(['b'])
+  })
+
+  it('完了した子だけを親から取り除く', () => {
+    const roots = scheduleTasks(
+      spec([
+        {
+          id: 'p',
+          title: 'P',
+          tasks: [
+            { id: 'c1', title: 'C1', estimate: '1d', progress: 100 },
+            { id: 'c2', title: 'C2', estimate: '1d' },
+          ],
+        },
+      ]),
+      { today: TODAY },
+    )
+    const kept = filterCompleted(roots)
+    expect(kept.map((n) => n.task.id)).toEqual(['p'])
+    expect(kept[0].children.map((n) => n.task.id)).toEqual(['c2'])
   })
 })
 

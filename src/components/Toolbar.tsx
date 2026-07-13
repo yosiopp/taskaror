@@ -1,19 +1,19 @@
 /**
- * 画面上部のツールバー。プロジェクトタイトル入力と、選択中タスクに対する
- * 編集操作(追加・削除・階層変更・並び替え)のボタンを並べる。
+ * グローバルヘッダ(2 行構成)。
+ * 1 行目: アプリ名 / プロジェクトタイトル / メニューバー([ファイル]・[編集]・[表示])。
+ * 2 行目: タスク操作のツールバー(Material Icons)。ガント編集ビューでのみ表示する。
+ * 旧ツールバーに散在していた操作(ファイル・undo/redo・ビュー切替・クリティカルパス)は
+ * すべてメニューへ集約し、ここには重複させない。
  */
 import { useRef } from 'react'
 import type { ChangeEvent } from 'react'
+import MenuBar from './MenuBar'
+import type { Menu } from './MenuBar'
+import { Icon } from './icons'
+import type { IconName } from './icons'
 
 /** 本文のビューモード(ガント編集 / YAML テキスト / WBS 表) */
 export type ViewMode = 'gantt' | 'yaml' | 'wbs'
-
-/** 切り替えタブの定義(表示順) */
-const VIEW_TABS: { mode: ViewMode; label: string }[] = [
-  { mode: 'gantt', label: 'ガント編集' },
-  { mode: 'yaml', label: 'YAML' },
-  { mode: 'wbs', label: 'WBS表' },
-]
 
 export interface ToolbarProps {
   /** プロジェクトタイトル(spec.info?.title) */
@@ -28,6 +28,10 @@ export interface ToolbarProps {
   showCriticalPath: boolean
   /** クリティカルパス表示の ON/OFF を切り替える */
   onToggleCriticalPath: () => void
+  /** 完了タスク(progress === 100)を非表示にしているか */
+  hideCompleted: boolean
+  /** 完了タスク非表示の ON/OFF を切り替える */
+  onToggleHideCompleted: () => void
   /** ガントを SVG 画像として書き出す */
   onExportSvg: () => void
   /** ガントを PNG 画像として書き出す */
@@ -47,13 +51,21 @@ export interface ToolbarProps {
   onRedo: () => void
   /** ＋ タスク(選択中なら兄弟の後ろ、未選択ならルート末尾) */
   onAdd: () => void
-  /** ＋ 子タスク(選択中の子として追加) */
-  onAddChild: () => void
   onRemove: () => void
   onIndent: () => void
   onOutdent: () => void
   onMoveUp: () => void
   onMoveDown: () => void
+}
+
+/** 2 行目のツールバーに並べるタスク操作ボタンの定義 */
+interface ToolButton {
+  icon: IconName
+  label: string
+  onClick: () => void
+  /** 選択中タスクがないと無効化する */
+  needsSelection: boolean
+  danger?: boolean
 }
 
 function Toolbar(props: ToolbarProps) {
@@ -64,6 +76,8 @@ function Toolbar(props: ToolbarProps) {
     onViewModeChange,
     showCriticalPath,
     onToggleCriticalPath,
+    hideCompleted,
+    onToggleHideCompleted,
     onExportSvg,
     onExportPng,
     onTitleChange,
@@ -75,7 +89,6 @@ function Toolbar(props: ToolbarProps) {
     onUndo,
     onRedo,
     onAdd,
-    onAddChild,
     onRemove,
     onIndent,
     onOutdent,
@@ -83,9 +96,7 @@ function Toolbar(props: ToolbarProps) {
     onMoveDown,
   } = props
 
-  // 選択中タスクがないと成立しない操作は無効化する
   const noSelection = selectedId === null
-
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleTitle = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -103,43 +114,121 @@ function Toolbar(props: ToolbarProps) {
     event.target.value = ''
   }
 
+  const menus: Menu[] = [
+    {
+      label: 'ファイル',
+      items: [
+        { kind: 'action', label: '新規', onSelect: onNew },
+        { kind: 'action', label: '開く…', onSelect: handleOpenClick },
+        { kind: 'action', label: '保存', onSelect: onSave },
+        { kind: 'separator' },
+        { kind: 'action', label: 'エクスポート(SVG)', onSelect: onExportSvg },
+        { kind: 'action', label: 'エクスポート(PNG)', onSelect: onExportPng },
+      ],
+    },
+    {
+      label: '編集',
+      items: [
+        {
+          kind: 'action',
+          label: '元に戻す',
+          onSelect: onUndo,
+          disabled: !canUndo,
+        },
+        {
+          kind: 'action',
+          label: 'やり直し',
+          onSelect: onRedo,
+          disabled: !canRedo,
+        },
+      ],
+    },
+    {
+      label: '表示',
+      items: [
+        {
+          kind: 'radio',
+          label: 'ガントチャート',
+          checked: viewMode === 'gantt',
+          onSelect: () => onViewModeChange('gantt'),
+        },
+        {
+          kind: 'radio',
+          label: 'YAML',
+          checked: viewMode === 'yaml',
+          onSelect: () => onViewModeChange('yaml'),
+        },
+        {
+          kind: 'radio',
+          label: 'WBS表',
+          checked: viewMode === 'wbs',
+          onSelect: () => onViewModeChange('wbs'),
+        },
+        { kind: 'separator' },
+        {
+          kind: 'checkbox',
+          label: 'クリティカルパスを強調',
+          checked: showCriticalPath,
+          onSelect: onToggleCriticalPath,
+        },
+        {
+          kind: 'checkbox',
+          label: '完了タスクを非表示',
+          checked: hideCompleted,
+          onSelect: onToggleHideCompleted,
+        },
+      ],
+    },
+  ]
+
+  const tools: ToolButton[] = [
+    { icon: 'add', label: 'タスク追加', onClick: onAdd, needsSelection: false },
+    {
+      icon: 'delete',
+      label: 'タスク削除',
+      onClick: onRemove,
+      needsSelection: true,
+      danger: true,
+    },
+    {
+      icon: 'outdent',
+      label: 'アウトデント',
+      onClick: onOutdent,
+      needsSelection: true,
+    },
+    {
+      icon: 'indent',
+      label: 'インデント',
+      onClick: onIndent,
+      needsSelection: true,
+    },
+    {
+      icon: 'moveUp',
+      label: 'タスク移動↑',
+      onClick: onMoveUp,
+      needsSelection: true,
+    },
+    {
+      icon: 'moveDown',
+      label: 'タスク移動↓',
+      onClick: onMoveDown,
+      needsSelection: true,
+    },
+  ]
+
   return (
-    <header className="toolbar">
-      <span className="toolbar-brand">taskaror</span>
-      <input
-        className="toolbar-title"
-        type="text"
-        value={title}
-        placeholder="プロジェクト名"
-        aria-label="プロジェクト名"
-        onChange={handleTitle}
-      />
-      <span className="toolbar-sep" aria-hidden="true" />
-      <div className="toolbar-views" role="tablist" aria-label="ビュー切り替え">
-        {VIEW_TABS.map(({ mode, label }) => (
-          <button
-            key={mode}
-            type="button"
-            role="tab"
-            aria-selected={viewMode === mode}
-            className={viewMode === mode ? 'active' : undefined}
-            onClick={() => onViewModeChange(mode)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <span className="toolbar-sep" aria-hidden="true" />
-      <div className="toolbar-actions">
-        <button type="button" onClick={onNew}>
-          新規
-        </button>
-        <button type="button" onClick={onSave}>
-          保存
-        </button>
-        <button type="button" onClick={handleOpenClick}>
-          開く
-        </button>
+    <header className="app-header">
+      <div className="header-row header-row-top">
+        <span className="header-brand">taskaror</span>
+        <input
+          className="header-title"
+          type="text"
+          value={title}
+          placeholder="プロジェクト名"
+          aria-label="プロジェクト名"
+          onChange={handleTitle}
+        />
+        <MenuBar menus={menus} />
         <input
           ref={fileInputRef}
           type="file"
@@ -148,101 +237,28 @@ function Toolbar(props: ToolbarProps) {
           onChange={handleFileChange}
         />
       </div>
-      <span className="toolbar-sep" aria-hidden="true" />
-      <div className="toolbar-actions">
-        <button
-          type="button"
-          onClick={onUndo}
-          disabled={!canUndo}
-          aria-label="元に戻す"
-          title="元に戻す (Cmd/Ctrl+Z)"
-        >
-          ↶
-        </button>
-        <button
-          type="button"
-          onClick={onRedo}
-          disabled={!canRedo}
-          aria-label="やり直す"
-          title="やり直す (Cmd/Ctrl+Shift+Z)"
-        >
-          ↷
-        </button>
-      </div>
-      {/* タスク編集操作はガント編集ビューの選択タスクに作用するため、そのビューでのみ表示する */}
+
+      {/* タスク操作はガント編集ビューの選択タスクに作用するため、そのビューでのみ表示する */}
       {viewMode === 'gantt' ? (
-        <>
-          <span className="toolbar-sep" aria-hidden="true" />
-          <div className="toolbar-actions">
+        <div
+          className="header-row header-row-tools"
+          role="toolbar"
+          aria-label="タスク操作"
+        >
+          {tools.map((tool) => (
             <button
+              key={tool.icon}
               type="button"
-              className="critical-toggle"
-              aria-pressed={showCriticalPath}
-              onClick={onToggleCriticalPath}
-              title="クリティカルパス(余裕 0 のタスク鎖)を強調表示する"
+              className={`tool-button${tool.danger ? ' danger' : ''}`}
+              title={tool.label}
+              aria-label={tool.label}
+              disabled={tool.needsSelection && noSelection}
+              onClick={tool.onClick}
             >
-              クリティカルパス
+              <Icon name={tool.icon} />
             </button>
-          </div>
-          <span className="toolbar-sep" aria-hidden="true" />
-          <div className="toolbar-actions">
-            <button
-              type="button"
-              onClick={onExportSvg}
-              title="ガントチャートを SVG 画像として書き出す"
-            >
-              SVG 書き出し
-            </button>
-            <button
-              type="button"
-              onClick={onExportPng}
-              title="ガントチャートを PNG 画像として書き出す"
-            >
-              PNG 書き出し
-            </button>
-          </div>
-          <span className="toolbar-sep" aria-hidden="true" />
-          <div className="toolbar-actions">
-            <button type="button" onClick={onAdd}>
-              ＋ タスク
-            </button>
-            <button type="button" onClick={onAddChild} disabled={noSelection}>
-              ＋ 子タスク
-            </button>
-            <button
-              type="button"
-              className="danger"
-              onClick={onRemove}
-              disabled={noSelection}
-            >
-              削除
-            </button>
-            <span className="toolbar-sep" aria-hidden="true" />
-            <button type="button" onClick={onOutdent} disabled={noSelection}>
-              ← アウトデント
-            </button>
-            <button type="button" onClick={onIndent} disabled={noSelection}>
-              インデント →
-            </button>
-            <span className="toolbar-sep" aria-hidden="true" />
-            <button
-              type="button"
-              onClick={onMoveUp}
-              disabled={noSelection}
-              aria-label="上へ移動"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              onClick={onMoveDown}
-              disabled={noSelection}
-              aria-label="下へ移動"
-            >
-              ↓
-            </button>
-          </div>
-        </>
+          ))}
+        </div>
       ) : null}
     </header>
   )

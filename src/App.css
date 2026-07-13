@@ -56,24 +56,34 @@
   overflow: hidden;
 }
 
-/* --- ツールバー --- */
-.toolbar {
+/* --- グローバルヘッダ(2 行構成) --- */
+.app-header {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-alt);
+  padding: 0.4rem 0.75rem;
   flex-wrap: wrap;
 }
 
-.toolbar-brand {
+/* 2 行目(ツールバー)は 1 行目と区切る薄い罫線を引く */
+.header-row-tools {
+  border-top: 1px solid var(--border);
+}
+
+.header-brand {
   font-weight: 700;
   font-size: 1.05rem;
   margin-right: 0.25rem;
 }
 
-.toolbar-title {
+.header-title {
   flex: 0 1 240px;
   padding: 0.3rem 0.5rem;
   font-size: 0.9375rem;
@@ -83,86 +93,127 @@
   border-radius: 6px;
 }
 
-.toolbar-actions {
+/* --- メニューバー([ファイル]・[編集]・[表示]) --- */
+.menubar {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
+  gap: 0.1rem;
 }
 
-.toolbar button {
-  padding: 0.3rem 0.6rem;
+.menubar-menu {
+  position: relative;
+}
+
+.menubar-trigger {
+  padding: 0.3rem 0.7rem;
   font-size: 0.875rem;
   color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
 }
 
-.toolbar button:hover:not(:disabled) {
-  border-color: var(--accent);
+.menubar-trigger:hover,
+.menubar-trigger.open {
+  background: var(--surface);
+  border-color: var(--border);
 }
 
-.toolbar button:disabled {
+.menubar-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ドロップダウン本体。トリガの直下に絶対配置する */
+.menubar-dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 150;
+  min-width: 200px;
+  padding: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.menubar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8125rem;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.menubar-item:hover:not(:disabled),
+.menubar-item:focus-visible {
+  background: var(--row-hover);
+  outline: none;
+}
+
+.menubar-item:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.toolbar button.danger:hover:not(:disabled) {
-  border-color: var(--gantt-today);
-  color: var(--gantt-today);
+/* チェック(✓)欄。radio/checkbox の現在状態を示す固定幅の欄 */
+.menubar-check {
+  flex: 0 0 1rem;
+  color: var(--accent);
+  font-size: 0.8rem;
 }
 
-/* クリティカルパス表示トグル。ON のときは赤系で押下状態を示す */
-.toolbar button.critical-toggle[aria-pressed='true'] {
-  color: #fff;
-  background: var(--critical);
-  border-color: var(--critical);
+.menubar-label {
+  flex: 1;
 }
 
-.toolbar button.critical-toggle[aria-pressed='true']:hover {
-  border-color: var(--critical);
-  filter: brightness(1.05);
-}
-
-.toolbar-sep {
-  width: 1px;
-  height: 1.25rem;
+.menubar-separator {
+  height: 1px;
+  margin: 0.25rem 0.25rem;
   background: var(--border);
-  margin: 0 0.15rem;
 }
 
-/* --- ビュー切り替えタブ(ガント編集 / YAML / WBS表) --- */
-.toolbar-views {
+/* --- 2 行目ツールバーのアイコンボタン --- */
+.header-row-tools {
+  gap: 0.25rem;
+}
+
+.tool-button {
   display: inline-flex;
-  gap: 0.15rem;
-  padding: 0.15rem;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-/* .toolbar button より後に定義して同スコアで上書きする(枠なしのタブ表示にする) */
-.toolbar-views button {
-  padding: 0.25rem 0.6rem;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
   border-radius: 6px;
   cursor: pointer;
 }
 
-.toolbar-views button:hover:not(.active) {
-  color: var(--text);
-  border-color: transparent;
+.tool-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
-.toolbar-views button.active {
-  color: var(--text);
-  background: var(--surface-alt);
-  box-shadow: inset 0 0 0 1px var(--border);
+.tool-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tool-button.danger:hover:not(:disabled) {
+  border-color: var(--gantt-today);
+  color: var(--gantt-today);
 }
 
 /* --- エラーバナー --- */

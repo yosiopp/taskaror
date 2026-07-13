@@ -49,6 +49,7 @@ import type { ScheduledTask } from './lib/schedule'
 import {
   computeDayWindow,
   computeGanttLayout,
+  filterCompleted,
   flattenScheduled,
   nextSelectionAfterRemoval,
 } from './lib/gantt'
@@ -211,6 +212,29 @@ function saveShowCriticalPath(on: boolean): void {
   }
 }
 
+/** 完了タスク非表示の保存キー */
+const HIDE_COMPLETED_KEY = 'taskaror:hideCompleted'
+
+/** 完了タスク非表示の ON/OFF を復元する(未保存・不正なら OFF) */
+function loadHideCompleted(): boolean {
+  if (typeof localStorage === 'undefined') return false
+  try {
+    return localStorage.getItem(HIDE_COMPLETED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** 完了タスク非表示の ON/OFF を保存する(ブラウザ専用。失敗しても無視する) */
+function saveHideCompleted(on: boolean): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(HIDE_COMPLETED_KEY, on ? '1' : '0')
+  } catch {
+    // 容量超過やプライベートモードでの失敗は無視する
+  }
+}
+
 /** 次のローカル深夜(0 時)までのミリ秒。日跨ぎで「今日」を更新するタイマーに使う */
 function msUntilNextLocalMidnight(): number {
   const now = new Date()
@@ -353,6 +377,8 @@ function App() {
   // クリティカルパスの強調表示 ON/OFF(ガントのバー・矢印に反映)
   const [showCriticalPath, setShowCriticalPath] =
     useState<boolean>(loadShowCriticalPath)
+  // 完了タスク(progress === 100)を表示から隠すビューフィルタ(spec は変えない)
+  const [hideCompleted, setHideCompleted] = useState<boolean>(loadHideCompleted)
   // 「今日」('YYYY-MM-DD')。今日線・スケジュールの基準日。日付をまたぐと更新する
   const [today, setToday] = useState<string>(() => formatDate(localToday()))
 
@@ -372,6 +398,11 @@ function App() {
   useEffect(() => {
     saveShowCriticalPath(showCriticalPath)
   }, [showCriticalPath])
+
+  // 完了タスク非表示の ON/OFF を localStorage に保存する
+  useEffect(() => {
+    saveHideCompleted(hideCompleted)
+  }, [hideCompleted])
 
   // 日付をまたいだら「今日」を更新し、今日線・スケジュールを追従させる。
   // 次のローカル深夜に setTimeout を張り、発火したら today を更新して次の深夜を張り直す。
@@ -440,7 +471,12 @@ function App() {
   >(() => {
     try {
       const scheduled = scheduleTasks(spec, { today })
-      const rows = flattenScheduled(scheduled, collapsedIds)
+      // 完了タスク非表示は「ガント表示のフィルタ」。scheduled 本体(WBS 表・
+      // クリティカルパス算出に使う)は全タスクのまま保ち、表示行だけを絞る。
+      const displayRoots = hideCompleted
+        ? filterCompleted(scheduled)
+        : scheduled
+      const rows = flattenScheduled(displayRoots, collapsedIds)
       const layout = computeGanttLayout(rows, {
         dayWidth: DAY_WIDTH,
         rowHeight: ROW_HEIGHT,
@@ -451,7 +487,7 @@ function App() {
       const message = thrown instanceof Error ? thrown.message : String(thrown)
       return { ok: false, error: message }
     }
-  }, [spec, collapsedIds, today])
+  }, [spec, collapsedIds, today, hideCompleted])
 
   // 直近の正常な派生結果を保持し、計算失敗時はこれを表示し続ける(アプリを落とさない)。
   // 正常に計算できたらレンダー中に取り込む(収束するので追加のレンダーは 1 回のみ)。
@@ -568,13 +604,6 @@ function App() {
     const task = newTask(spec)
     const mode: AddMode = selectedId ? 'sibling-after' : 'root-append'
     dispatch({ type: 'addTask', task, mode, targetId: selectedId ?? undefined })
-    setSelectedId(task.id)
-  }
-
-  const handleAddChild = (): void => {
-    if (!selectedId) return
-    const task = newTask(spec)
-    dispatch({ type: 'addTask', task, mode: 'child', targetId: selectedId })
     setSelectedId(task.id)
   }
 
@@ -806,6 +835,8 @@ function App() {
         onViewModeChange={setViewMode}
         showCriticalPath={showCriticalPath}
         onToggleCriticalPath={() => setShowCriticalPath((on) => !on)}
+        hideCompleted={hideCompleted}
+        onToggleHideCompleted={() => setHideCompleted((on) => !on)}
         onExportSvg={handleExportSvg}
         onExportPng={handleExportPng}
         onTitleChange={(title) => dispatch({ type: 'setInfoTitle', title })}
@@ -817,7 +848,6 @@ function App() {
         onUndo={() => dispatch({ type: 'undo' })}
         onRedo={() => dispatch({ type: 'redo' })}
         onAdd={handleAdd}
-        onAddChild={handleAddChild}
         onRemove={handleRemove}
         onIndent={handleIndent}
         onOutdent={handleOutdent}

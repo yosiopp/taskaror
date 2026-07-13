@@ -30,6 +30,19 @@ describe('App スモーク', () => {
     expect(html).toContain('<svg')
   })
 
+  it('ヘッダにメニューバー(ファイル/編集/表示)が描画される', () => {
+    expect(html).toContain('ファイル')
+    expect(html).toContain('編集')
+    expect(html).toContain('表示')
+  })
+
+  it('2 行目ツールバーのタスク操作ボタンが描画される', () => {
+    // アイコンボタンは aria-label で機能名を持つ(ガント編集ビュー時)
+    expect(html).toContain('タスク追加')
+    expect(html).toContain('タスク削除')
+    expect(html).toContain('インデント')
+  })
+
   it('スケジュール計算エラーは表示されない(サンプルは正常)', () => {
     expect(html).not.toContain('スケジュールを計算できませんでした')
   })

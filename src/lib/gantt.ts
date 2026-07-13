@@ -58,6 +58,24 @@ export function flattenScheduled(
 }
 
 /**
+ * 完了タスク(progress === 100)を表示から除くビューフィルタ。
+ * spec は変更せず、スケジュール導出結果のツリーから完了ノード(とその子孫)を落とす。
+ * 「完了」は progress === 100 と定義する(tasks.md の検討メモ)。
+ */
+export function filterCompleted(roots: ScheduledTask[]): ScheduledTask[] {
+  const result: ScheduledTask[] = []
+  for (const node of roots) {
+    if (node.task.progress === 100) continue
+    result.push(
+      node.children.length > 0
+        ? { ...node, children: filterCompleted(node.children) }
+        : node,
+    )
+  }
+  return result
+}
+
+/**
  * タスク削除後に選択を移す先の id を、削除前の表示行(visibleRows)から求める。
  * 削除される部分木(自身+可視の子孫)の直後にある可視タスクを優先し(直下)、
  * 無ければ部分木の直前の行(祖先または先行タスク。削除後も残る)を選ぶ(直上)。
