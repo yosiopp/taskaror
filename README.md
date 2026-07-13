@@ -134,6 +134,8 @@ docker compose --profile prod up web --build
 
 Vite + React 19 + TypeScript の SPA です。将来的に CLI（linter / validator / SVG ガント出力）へ展開できるよう、コアロジック（検証・スケジュール導出・ガントのレイアウト計算）はブラウザ / React 非依存の純粋な TypeScript として `src/lib` に実装しています。
 
+CLI 化にあたっては、web と CLI を同一リポジトリに同居させるモノレポ構成（npm workspaces を基本線）へ移行し、共有コアを独立パッケージへ切り出す予定です。実行は `taskaror` を単一エントリとし、npx（`npx taskaror <command>`）または Docker（`docker run … taskaror <command>`）から行えるようにします（ネイティブバイナリ化はしません）。web の GUI も `taskaror serve` で起動する静的 SPA として提供し（従来どおり localStorage + ダウンロード/アップロードで、ファイルの直接編集はしません）、`validate` / `lint` / `svg` などのサブコマンドは spec ファイルを引数に取ります。
+
 ## 提供予定のツール群
 
 - TaskSpec JSON Schema / バリデーター / Linter / Formatter

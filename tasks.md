@@ -78,20 +78,25 @@
 
 > 配布・実行方針(決定済み):
 >
+> - **`taskaror` を単一エントリとし、web も CLI も同じコマンドのサブコマンドとして提供する(CLI ファースト)。** 実行は npx / Docker の 2 経路。
 > - **実行可能バイナリ(単一バイナリ化 / pkg 等でのネイティブ化)は作らない。** Node.js 実行環境を前提とする。
-> - CLI は次の 2 経路で実行できれば十分とする:
 >   - **npx 経由** — npm パッケージの `bin` として公開し、`npx taskaror <command>` で実行する。
->   - **Docker 経由** — CLI を entrypoint にしたイメージを用意し、`docker run` で実行する(既存の colima 環境で動作確認)。
+>   - **Docker 経由** — `taskaror` を entrypoint にしたイメージを用意し、`docker run … taskaror <command>` で実行する(既存の colima 環境で動作確認)。
+> - **サブコマンドと引数の考え方:**
+>   - `serve` — 既存の静的 SPA をローカルサーバで配信するだけ。**web はこれまで通り静的 SPA のまま**(spec の保持は localStorage + ダウンロード/アップロード。ファイルの直接編集・ボリュームマウントは不要)。docker では web に到達するためポート公開する(例: `docker run --rm -p 5173:5173 taskaror serve`)。
+>   - `validate` / `lint` / `svg` — 引数で spec ファイルを受け取って読み込む。docker では対象ファイルにアクセスするためカレントをマウントする(例: `docker run --rm -v $PWD:/work taskaror validate task.taskspec.yaml`)。
 > - **コアの分離方式は「モノレポ」に決定。** web(現行 SPA)と CLI を同一リポジトリに同居させ、共有するコアロジック(schedule / validate / ganttSvg 等の React 非依存部分)を独立パッケージに切り出して web / CLI 双方から参照する。npm workspaces での構成を基本線とする。
+> - 既存 `compose.yaml` の `dev` / `web` プロファイルは開発・確認用の便宜として残し、`taskaror serve` を製品レベルの統一起動コマンドとする。
 
 - [ ] モノレポ構成へ移行する(npm workspaces。web と CLI を同一リポジトリに置く)
   - [ ] コアロジック(React 非依存の lib 群)を共有パッケージに切り出し、web / CLI から参照できるようにする
 - [ ] CLI の基盤を作る(コマンド体系・引数設計。Node.js で実行し、npm の `bin` と Docker entrypoint の両方から呼べる形にする)
   - [ ] npx 経由の実行を用意する(package.json の `bin` 定義。`npx taskaror <command>` で動く)
-  - [ ] Docker 経由の実行を用意する(CLI 用の Dockerfile / entrypoint。`docker run` で動く)
-- [ ] validator コマンド(schema 検証+構造検証。フェーズ 1 の実装を再利用)
+  - [ ] Docker 経由の実行を用意する(`taskaror` を entrypoint にしたイメージ。`docker run` で動く)
+- [ ] serve コマンド(既存の静的 SPA をローカルサーバで配信。web は静的のまま=ファイル直編集なし。docker では `-p` でポート公開、マウント不要)
+- [ ] validator コマンド(schema 検証+構造検証。フェーズ 1 の実装を再利用。spec ファイルを引数で受ける)
 - [ ] linter コマンド(何を lint するかのルール仕様策定から)
-- [ ] ガントチャート SVG 出力コマンド(フェーズ 4 のレイアウト計算を再利用)
+- [ ] ガントチャート SVG 出力コマンド(フェーズ 4 のレイアウト計算を再利用。spec ファイルを引数で受け、SVG を出力)
 
 ## 決めごと(決定済み)
 
