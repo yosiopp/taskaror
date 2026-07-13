@@ -55,6 +55,21 @@ describe('App の UI', () => {
     expect(screen.getByText('Ctrl+Z')).toBeInTheDocument()
     expect(screen.getByText('Insert')).toBeInTheDocument()
     expect(screen.getByText('Delete')).toBeInTheDocument()
+    // 移動・インデント操作もショートカット併記でメニューに出る
+    expect(screen.getByText('Ctrl+↑')).toBeInTheDocument()
+    expect(screen.getByText('Ctrl+↓')).toBeInTheDocument()
+    expect(screen.getByText('Ctrl+→')).toBeInTheDocument()
+    expect(screen.getByText('Ctrl+←')).toBeInTheDocument()
+  })
+
+  it('[編集]メニューの移動・インデントは未選択時は無効になっている', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('menuitem', { name: '編集' }))
+    // 初期は未選択なので、選択タスクに作用する項目は無効表示
+    expect(screen.getByRole('menuitem', { name: /タスク移動↑/ })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: /インデント/ })).toBeDisabled()
   })
 
   it('Insert キーでタスクを追加し、Delete キーで削除できる', async () => {
@@ -83,23 +98,34 @@ describe('App の UI', () => {
     expect(screen.getByText('新しいタスク')).toBeInTheDocument()
   })
 
-  it('ツールバーのツールチップにショートカットキーが表示される', () => {
+  it('ツールバーのツールチップは機能名のみでショートカットを併記しない', () => {
     render(<App />)
+    // ショートカットの併記はメニューバーの項目のみ。ツールチップ(title)は機能名だけ
     expect(screen.getByRole('button', { name: 'タスク移動↑' })).toHaveAttribute(
       'title',
-      'タスク移動↑(Ctrl+↑)',
-    )
-    expect(screen.getByRole('button', { name: 'タスク移動↓' })).toHaveAttribute(
-      'title',
-      'タスク移動↓(Ctrl+↓)',
+      'タスク移動↑',
     )
     expect(screen.getByRole('button', { name: 'インデント' })).toHaveAttribute(
       'title',
-      'インデント(Ctrl+→)',
+      'インデント',
     )
-    expect(
-      screen.getByRole('button', { name: 'アウトデント' }),
-    ).toHaveAttribute('title', 'アウトデント(Ctrl+←)')
+  })
+
+  it('[ヘルプ]メニューに GitHub リンクと [taskaror について] がある', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('menuitem', { name: 'ヘルプ' }))
+
+    // GitHub リポジトリへのリンク(新規タブで開く)
+    const link = screen.getByRole('menuitem', { name: /GitHub リポジトリ/ })
+    expect(link).toHaveAttribute('href', 'https://github.com/yosiopp/taskaror')
+    expect(link).toHaveAttribute('target', '_blank')
+
+    // [taskaror について] を開くとバージョンが表示される
+    await user.click(screen.getByRole('menuitem', { name: 'taskaror について' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/バージョン/)).toBeInTheDocument()
   })
 
   it('タスクの行をダブルクリックすると編集ダイアログが開き依存リストが出る', async () => {

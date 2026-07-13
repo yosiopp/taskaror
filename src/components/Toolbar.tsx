@@ -11,6 +11,7 @@ import MenuBar from './MenuBar'
 import type { Menu } from './MenuBar'
 import { Icon } from './icons'
 import type { IconName } from './icons'
+import { REPOSITORY_URL } from '../appInfo'
 
 /** 本文のビューモード(ガント編集 / YAML テキスト / WBS 表) */
 export type ViewMode = 'gantt' | 'yaml' | 'wbs'
@@ -56,6 +57,8 @@ export interface ToolbarProps {
   onOutdent: () => void
   onMoveUp: () => void
   onMoveDown: () => void
+  /** [ヘルプ] → [taskaror について] のダイアログを開く */
+  onAbout: () => void
 }
 
 /** 2 行目のツールバーに並べるタスク操作ボタンの定義 */
@@ -65,8 +68,6 @@ interface ToolButton {
   onClick: () => void
   /** 選択中タスクがないと無効化する */
   needsSelection: boolean
-  /** ツールチップに併記するショートカットキー(例: 'Ctrl+↑') */
-  shortcut?: string
   danger?: boolean
 }
 
@@ -96,6 +97,7 @@ function Toolbar(props: ToolbarProps) {
     onOutdent,
     onMoveUp,
     onMoveDown,
+    onAbout,
   } = props
 
   const noSelection = selectedId === null
@@ -159,6 +161,35 @@ function Toolbar(props: ToolbarProps) {
           disabled: noSelection,
           shortcut: 'Delete',
         },
+        { kind: 'separator' },
+        {
+          kind: 'action',
+          label: 'タスク移動↑',
+          onSelect: onMoveUp,
+          disabled: noSelection,
+          shortcut: 'Ctrl+↑',
+        },
+        {
+          kind: 'action',
+          label: 'タスク移動↓',
+          onSelect: onMoveDown,
+          disabled: noSelection,
+          shortcut: 'Ctrl+↓',
+        },
+        {
+          kind: 'action',
+          label: 'インデント',
+          onSelect: onIndent,
+          disabled: noSelection,
+          shortcut: 'Ctrl+→',
+        },
+        {
+          kind: 'action',
+          label: 'アウトデント',
+          onSelect: onOutdent,
+          disabled: noSelection,
+          shortcut: 'Ctrl+←',
+        },
       ],
     },
     {
@@ -197,6 +228,22 @@ function Toolbar(props: ToolbarProps) {
         },
       ],
     },
+    {
+      label: 'ヘルプ',
+      items: [
+        {
+          kind: 'link',
+          label: 'GitHub リポジトリ',
+          href: REPOSITORY_URL,
+        },
+        { kind: 'separator' },
+        {
+          kind: 'action',
+          label: 'taskaror について',
+          onSelect: onAbout,
+        },
+      ],
+    },
   ]
 
   const tools: ToolButton[] = [
@@ -205,14 +252,12 @@ function Toolbar(props: ToolbarProps) {
       label: 'タスク追加',
       onClick: onAdd,
       needsSelection: false,
-      shortcut: 'Insert',
     },
     {
       icon: 'delete',
       label: 'タスク削除',
       onClick: onRemove,
       needsSelection: true,
-      shortcut: 'Delete',
       danger: true,
     },
     {
@@ -220,28 +265,24 @@ function Toolbar(props: ToolbarProps) {
       label: 'アウトデント',
       onClick: onOutdent,
       needsSelection: true,
-      shortcut: 'Ctrl+←',
     },
     {
       icon: 'indent',
       label: 'インデント',
       onClick: onIndent,
       needsSelection: true,
-      shortcut: 'Ctrl+→',
     },
     {
       icon: 'moveUp',
       label: 'タスク移動↑',
       onClick: onMoveUp,
       needsSelection: true,
-      shortcut: 'Ctrl+↑',
     },
     {
       icon: 'moveDown',
       label: 'タスク移動↓',
       onClick: onMoveDown,
       needsSelection: true,
-      shortcut: 'Ctrl+↓',
     },
   ]
 
@@ -279,11 +320,9 @@ function Toolbar(props: ToolbarProps) {
               key={tool.icon}
               type="button"
               className={`tool-button${tool.danger ? ' danger' : ''}`}
-              // ツールチップ(title)には機能名とショートカットを併記する。
-              // aria-label は機能名のみにして操作対象を簡潔に読み上げさせる。
-              title={
-                tool.shortcut ? `${tool.label}(${tool.shortcut})` : tool.label
-              }
+              // ツールチップ(title)は機能名のみ。ショートカットの併記はメニューバーの
+              // 項目でのみ行う(重複を避ける)。aria-label も機能名にして簡潔に読み上げる。
+              title={tool.label}
               aria-label={tool.label}
               disabled={tool.needsSelection && noSelection}
               onClick={tool.onClick}

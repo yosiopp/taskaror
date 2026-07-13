@@ -23,6 +23,7 @@ import PaneSeparator from './components/PaneSeparator'
 import YamlView from './components/YamlView'
 import WbsTable from './components/WbsTable'
 import TaskDialog from './components/TaskDialog'
+import AboutDialog from './components/AboutDialog'
 import LoadErrorNotice from './components/LoadError'
 import type { LoadError } from './components/LoadError'
 import {
@@ -377,6 +378,8 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 編集ダイアログの対象タスク id(null なら閉じている)
   const [dialogTaskId, setDialogTaskId] = useState<string | null>(null)
+  // [ヘルプ] → [taskaror について] ダイアログの開閉
+  const [aboutOpen, setAboutOpen] = useState(false)
   // ファイル読み込みの失敗内容(パース or 検証)。成功時・閉じたときは null
   const [loadError, setLoadError] = useState<LoadError | null>(null)
   // 本文のビューモード(ガント編集 / YAML / WBS 表)
@@ -907,6 +910,7 @@ function App() {
         onOutdent={handleOutdent}
         onMoveUp={() => handleMove('up')}
         onMoveDown={() => handleMove('down')}
+        onAbout={() => setAboutOpen(true)}
       />
 
       {loadError !== null ? (
@@ -996,6 +1000,8 @@ function App() {
           }}
         />
       ) : null}
+
+      {aboutOpen ? <AboutDialog onClose={() => setAboutOpen(false)} /> : null}
     </div>
   )
 }

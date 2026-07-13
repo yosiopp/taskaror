@@ -29,6 +29,12 @@ export type MenuItem =
       checked: boolean
       onSelect: () => void
     }
+  | {
+      kind: 'link'
+      label: string
+      /** 新規タブで開くリンク先(例: GitHub リポジトリ) */
+      href: string
+    }
   | { kind: 'separator' }
 
 export interface Menu {
@@ -54,7 +60,7 @@ function MenuBar({ menus }: MenuBarProps) {
 
   const barRef = useRef<HTMLDivElement>(null)
   const triggerRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const itemRefs = useRef<(HTMLButtonElement | HTMLAnchorElement | null)[]>([])
 
   // 外側クリック・スクロールで閉じる
   useEffect(() => {
@@ -98,7 +104,9 @@ function MenuBar({ menus }: MenuBarProps) {
   }
 
   const activate = (index: number, item: MenuItem): void => {
-    if (item.kind === 'separator') return
+    // separator / link はボタンの activate 経路を通らない(link はアンカーの
+    // 既定動作で開く)。型の網羅性のためにも早期 return しておく。
+    if (item.kind === 'separator' || item.kind === 'link') return
     if (item.kind === 'action' && item.disabled) return
     item.onSelect()
     closeAndFocusTrigger(index)
@@ -137,7 +145,7 @@ function MenuBar({ menus }: MenuBarProps) {
   }
 
   const onItemKeyDown = (
-    event: KeyboardEvent<HTMLButtonElement>,
+    event: KeyboardEvent<HTMLElement>,
     index: number,
   ): void => {
     const items = menus[index].items
@@ -205,6 +213,32 @@ function MenuBar({ menus }: MenuBarProps) {
                         className="menubar-separator"
                         role="separator"
                       />
+                    )
+                  }
+                  if (item.kind === 'link') {
+                    // 外部リンクは <a> で表現し、新規タブで開く。Enter は
+                    // アンカーの既定動作で発火するので onItemKeyDown は素通しでよい。
+                    return (
+                      <a
+                        key={item.label}
+                        className="menubar-item"
+                        role="menuitem"
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        tabIndex={activeItem === itemIndex ? 0 : -1}
+                        ref={(el) => {
+                          itemRefs.current[itemIndex] = el
+                        }}
+                        onClick={() => closeAndFocusTrigger(index)}
+                        onKeyDown={(event) => onItemKeyDown(event, index)}
+                      >
+                        <span className="menubar-check" aria-hidden="true" />
+                        <span className="menubar-label">{item.label}</span>
+                        <span className="menubar-shortcut" aria-hidden="true">
+                          ↗
+                        </span>
+                      </a>
                     )
                   }
                   const checked =

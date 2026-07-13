@@ -1063,6 +1063,51 @@ body.is-gantt-linking * {
   cursor: not-allowed;
 }
 
+/* --- [taskaror について] ダイアログ --- */
+/* head / foot は task-dialog のスタイルを流用し、本文だけ専用に持つ */
+.about-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.about-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem 0.9rem;
+}
+
+.about-name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.about-version {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.about-desc {
+  margin: 0.3rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.about-link {
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
 /* --- YAML テキストエディタビュー --- */
 .yaml-view {
   display: flex;
