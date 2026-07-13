@@ -105,18 +105,21 @@ npm run preview
 
 ### CLI(taskaror コマンド)
 
-CLI は `taskaror` を単一エントリとし、npx または Docker から実行できます。現在のサブコマンドは `serve` のみで、`validate` / `lint` / `svg` は今後追加予定です。
+CLI は `taskaror` を単一エントリとし、npx または Docker から実行できます。現在のサブコマンドは `serve` / `validate` で、`lint` / `svg` は今後追加予定です。
 
 ```bash
 # npx 経由(要 Node.js)
 npx taskaror --help               # 使い方を表示
 npx taskaror serve                # GUI エディタを配信(http://127.0.0.1:5173)
 npx taskaror serve --port 8080    # ポートを変更(--host で bind 先も変更可)
+npx taskaror validate task.taskspec.yaml    # spec を検証(複数ファイル可)
 
 # Docker 経由(taskaror が entrypoint のイメージ)
 docker build --target cli -t taskaror .
 docker run --rm taskaror --help
 docker run --rm -p 5173:5173 taskaror serve
+# ファイルを引数に取るコマンドは、カレントディレクトリを /work にマウントして渡す
+docker run --rm -v $PWD:/work taskaror validate task.taskspec.yaml
 ```
 
 `serve` が配信する web は静的 SPA のままです。編集内容は従来どおり localStorage とダウンロード/アップロードで扱うため、ファイルのマウントは不要です。リポジトリ内では、ルートで `npm run build` した後に `npm exec taskaror -- serve` でも実行できます。

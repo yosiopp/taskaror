@@ -94,7 +94,7 @@
   - [x] npx 経由の実行を用意する(package.json の `bin` 定義。`npx taskaror <command>` で動く)
   - [x] Docker 経由の実行を用意する(`taskaror` を entrypoint にしたイメージ。`docker run` で動く)
 - [x] serve コマンド(既存の静的 SPA をローカルサーバで配信。web は静的のまま=ファイル直編集なし。docker では `-p` でポート公開、マウント不要)
-- [ ] validator コマンド(schema 検証+構造検証。フェーズ 1 の実装を再利用。spec ファイルを引数で受ける)
+- [x] validator コマンド(schema 検証+構造検証。フェーズ 1 の実装を再利用。spec ファイルを引数で受ける)
 - [ ] linter コマンド(何を lint するかのルール仕様策定から)
 - [ ] ガントチャート SVG 出力コマンド(フェーズ 4 のレイアウト計算を再利用。spec ファイルを引数で受け、SVG を出力)
 

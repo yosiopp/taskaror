@@ -27,6 +27,9 @@ COPY --from=build /tmp/pack/*.tgz /tmp/pack/
 RUN npm install -g /tmp/pack/*.tgz && rm -rf /tmp/pack
 # コンテナ外からアクセスできるよう、serve の既定 bind 先を全インターフェースにする
 ENV TASKAROR_SERVE_HOST=0.0.0.0
+# ファイル引数を取るコマンド(validate / svg など)用の作業ディレクトリ。
+# 例: docker run --rm -v $PWD:/work taskaror validate task.taskspec.yaml
+WORKDIR /work
 EXPOSE 5173
 ENTRYPOINT ["taskaror"]
 CMD ["--help"]
