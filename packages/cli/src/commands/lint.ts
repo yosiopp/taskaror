@@ -11,6 +11,8 @@ import { loadSpecFile } from '../specFile'
 /** 1 ファイルの lint 結果。ok は「エラーなし・warning なし」(info は許容) */
 interface FileResult {
   ok: boolean
+  /** 指摘(warning・info とも)がひとつもなかったか(サマリ文言の判定に使う) */
+  clean: boolean
 }
 
 /**
@@ -22,7 +24,7 @@ function lintFile(file: string): FileResult {
   const loaded = loadSpecFile(file)
   if (!loaded.ok) {
     console.error(`${file}: ${loaded.message}`)
-    return { ok: false }
+    return { ok: false, clean: false }
   }
 
   // 構造が壊れた spec(循環など)に lint すると誤動作するため、先に validate 相当を通す
@@ -34,13 +36,13 @@ function lintFile(file: string): FileResult {
     for (const issue of validationIssues) {
       console.error(`  ${issue.path}: ${issue.message}`)
     }
-    return { ok: false }
+    return { ok: false, clean: false }
   }
 
   const issues = lintTaskSpec(loaded.spec)
   if (issues.length === 0) {
     console.log(`${file}: OK`)
-    return { ok: true }
+    return { ok: true, clean: true }
   }
 
   const warningCount = issues.filter(
@@ -56,23 +58,45 @@ function lintFile(file: string): FileResult {
     )
   }
   // info のみなら成功扱い(exit 0)。warning があれば失敗扱い(exit 1)
-  return { ok: warningCount === 0 }
+  return { ok: warningCount === 0, clean: false }
+}
+
+/** lint の使い方(ヘルプ)の文面 */
+function lintUsage(): string {
+  return [
+    '使い方: taskaror lint <ファイル>...',
+    '',
+    'spec のスケジュール導出から見た矛盾・怪しい記述を検出する(ルールは docs/lint.md)。',
+    '複数ファイルを指定できる。warning があれば終了コード 1、info のみなら 0 を返す。',
+    '',
+    'オプション:',
+    '  -h, --help  この使い方を表示する',
+  ].join('\n')
 }
 
 /** lint コマンド本体。終了コードを返す */
 function runLint(argv: string[]): number {
   let files: string[]
+  let help: boolean | undefined
   try {
-    files = parseArgs({
+    const parsed = parseArgs({
       args: argv,
-      options: {},
+      options: {
+        help: { type: 'boolean', short: 'h' },
+      },
       allowPositionals: true,
-    }).positionals
+    })
+    files = parsed.positionals
+    help = parsed.values.help
   } catch (err) {
     console.error(
       `エラー: lint の引数を解釈できません(${err instanceof Error ? err.message : String(err)})`,
     )
     return 2
+  }
+  if (help === true) {
+    console.log(lintUsage())
+    return 0
   }
   if (files.length === 0) {
     console.error('エラー: lint する spec ファイルを 1 つ以上指定してください')
@@ -80,16 +104,21 @@ function runLint(argv: string[]): number {
     return 2
   }
 
-  const okCount = files.filter((file) => lintFile(file).ok).length
-  const failedCount = files.length - okCount
+  const results = files.map((file) => lintFile(file))
+  const failedCount = results.filter((result) => !result.ok).length
   // 複数ファイルを lint したときは最後に集計を出す
   if (files.length > 1) {
     if (failedCount > 0) {
       console.error(
         `${files.length} ファイル中 ${failedCount} ファイルに指摘があります`,
       )
-    } else {
+    } else if (results.every((result) => result.clean)) {
       console.log(`${files.length} ファイルすべて OK`)
+    } else {
+      // info のみのファイルがあるときは「すべて OK」とは言わない(指摘表示との矛盾を避ける)
+      console.log(
+        `${files.length} ファイルすべてで warning はありませんでした(info のみ)`,
+      )
     }
   }
   return failedCount > 0 ? 1 : 0

@@ -22,25 +22,46 @@ const HEADER_HEIGHT = 48
 /** ヘッダのうち月ラベル帯の px 高 */
 const MONTH_BAND_HEIGHT = 20
 
+/** svg の使い方(ヘルプ)の文面 */
+function svgUsage(): string {
+  return [
+    '使い方: taskaror svg <ファイル> [-o <出力先>]',
+    '',
+    'spec からガントチャートを自己完結した SVG として出力する。',
+    '-o を省略すると標準出力へ書き出す。',
+    '',
+    'オプション:',
+    '  -o, --output <出力先>  SVG の書き出し先ファイル',
+    '  -h, --help             この使い方を表示する',
+  ].join('\n')
+}
+
 /** svg コマンド本体。終了コードを返す */
 function runSvg(argv: string[]): number {
   let output: string | undefined
   let files: string[]
+  let help: boolean | undefined
   try {
     const parsed = parseArgs({
       args: argv,
       options: {
         output: { type: 'string', short: 'o' },
+        help: { type: 'boolean', short: 'h' },
       },
       allowPositionals: true,
     })
     output = parsed.values.output
     files = parsed.positionals
+    help = parsed.values.help
   } catch (err) {
     console.error(
       `エラー: svg のオプションを解釈できません(${err instanceof Error ? err.message : String(err)})`,
     )
     return 2
+  }
+  if (help === true) {
+    console.log(svgUsage())
+    return 0
   }
   if (files.length !== 1) {
     console.error('エラー: spec ファイルを 1 つ指定してください')

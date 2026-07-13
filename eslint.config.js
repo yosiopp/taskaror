@@ -23,6 +23,14 @@ export default tseslint.config([
       globals: globals.node,
     },
   },
+  // .mjs(packages/cli/scripts のビルドスクリプトなど): JS 推奨設定+Node グローバル
+  {
+    files: ['**/*.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
   // packages/web のみ: React 系プラグイン+ブラウザグローバル
   {
     files: ['packages/web/**/*.{ts,tsx}'],

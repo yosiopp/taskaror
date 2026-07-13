@@ -176,6 +176,16 @@ describe('lint コマンド', () => {
     expect(joined(logSpy)).toContain('2 ファイルすべて OK')
   })
 
+  it('info のみのファイルがあるときは「すべて OK」と矛盾しないサマリで 0 を返す', async () => {
+    const code = await lintCommand.run([examplePath, infoOnlyPath])
+    expect(code).toBe(0)
+    const output = joined(logSpy)
+    expect(output).toContain(
+      '2 ファイルすべてで warning はありませんでした(info のみ)',
+    )
+    expect(output).not.toContain('すべて OK')
+  })
+
   it('ファイル指定なしは使い方エラーで 2 を返す', async () => {
     const code = await lintCommand.run([])
     expect(code).toBe(2)
@@ -189,4 +199,13 @@ describe('lint コマンド', () => {
     expect(code).toBe(2)
     expect(joined(errorSpy)).toContain('lint の引数を解釈できません')
   })
+
+  it.each([['--help'], ['-h']])(
+    '%s で lint の使い方を表示して 0 を返す',
+    async (flag) => {
+      const code = await lintCommand.run([flag])
+      expect(code).toBe(0)
+      expect(joined(logSpy)).toContain('使い方: taskaror lint')
+    },
+  )
 })

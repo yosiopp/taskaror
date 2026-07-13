@@ -55,7 +55,7 @@ import {
 } from '@taskaror/core/history'
 import { flattenTasks, serializeTaskSpec } from '@taskaror/core/taskspec'
 import { parseTaskSpecDocument } from '@taskaror/core/fidelity'
-import type { Document } from 'yaml'
+import type { Document } from '@taskaror/core/fidelity'
 import {
   emptyTaskSpec,
   ganttImageFileName,

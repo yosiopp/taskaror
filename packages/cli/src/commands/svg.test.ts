@@ -146,4 +146,13 @@ describe('svg コマンド', () => {
     expect(code).toBe(2)
     expect(joined(errorSpy)).toContain('svg のオプションを解釈できません')
   })
+
+  it.each([['--help'], ['-h']])(
+    '%s で svg の使い方を表示して 0 を返す',
+    async (flag) => {
+      const code = await svgCommand.run([flag])
+      expect(code).toBe(0)
+      expect(joined(logSpy)).toContain('使い方: taskaror svg')
+    },
+  )
 })

@@ -11,9 +11,9 @@
  */
 import { useState } from 'react'
 import type { ChangeEvent } from 'react'
-import type { Document } from 'yaml'
 import { serializeTaskSpec } from '@taskaror/core/taskspec'
 import { parseTaskSpecDocument } from '@taskaror/core/fidelity'
+import type { Document } from '@taskaror/core/fidelity'
 import { validateTaskSpec } from '@taskaror/core/validate'
 import LoadErrorNotice from './LoadError'
 import type { LoadError } from './LoadError'

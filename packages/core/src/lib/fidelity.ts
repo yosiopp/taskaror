@@ -24,6 +24,9 @@ import type { Document, YAMLMap, YAMLSeq } from 'yaml'
 import type { Task, TaskSpec } from '../types/taskspec'
 import { parseTaskSpec } from './taskspec'
 
+// 利用側(web など)が yaml パッケージへ直接依存せずに済むよう、Document 型を再公開する
+export type { Document } from 'yaml'
+
 /**
  * YAML 文字列を「編集用のプレーンオブジェクト(spec)」と「コメント等を保持した元
  * Document(doc)」の両方として読み込む。検証(バージョン・tasks 配列)は parseTaskSpec を

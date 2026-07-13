@@ -176,4 +176,13 @@ describe('validate コマンド', () => {
     expect(code).toBe(2)
     expect(joined(errorSpy)).toContain('validate の引数を解釈できません')
   })
+
+  it.each([['--help'], ['-h']])(
+    '%s で validate の使い方を表示して 0 を返す',
+    async (flag) => {
+      const code = await validateCommand.run([flag])
+      expect(code).toBe(0)
+      expect(joined(logSpy)).toContain('使い方: taskaror validate')
+    },
+  )
 })

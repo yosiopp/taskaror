@@ -4,6 +4,9 @@
   "description": "TaskSpec(YAML ベースのタスク定義フォーマット)を編集・検証・可視化する CLI",
   "license": "Apache-2.0",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "bin": {
     "taskaror": "dist/taskaror.cjs"
   },

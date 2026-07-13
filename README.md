@@ -105,7 +105,7 @@ npm run preview
 
 ### CLI(taskaror コマンド)
 
-CLI は `taskaror` を単一エントリとし、npx または Docker から実行できます。現在のサブコマンドは `serve` / `validate` / `lint` / `svg` です。
+CLI は `taskaror` を単一エントリとし、npx または Docker から実行できます(npx 実行には Node.js 20 以上が必要です)。現在のサブコマンドは `serve` / `validate` / `lint` / `svg` です。
 
 ```bash
 # npx 経由(要 Node.js)
