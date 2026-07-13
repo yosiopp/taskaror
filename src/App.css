@@ -808,8 +808,30 @@ body.is-gantt-resizing * {
   fill: var(--critical);
 }
 
+/* 選択された依存線。クリティカル強調(赤)と衝突しないアクセント色で、より太くする。
+   .critical より後に定義し、両立時は選択(ユーザーの明示操作)を優先表示する。 */
+.gantt-arrow.selected {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.gantt-arrowhead-selected {
+  fill: var(--accent);
+}
+
+/* 依存線の透明ヒットライン。見た目の矢印は細く掴みにくいので、太い透明線を重ねて
+   当たり判定を広げる。paint に依存せず stroke 上でクリックを受ける。 */
+.gantt-arrow-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 10;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
 /* --- 依存線ドラッグ(バー端の接続ハンドル → 対象バー) --- */
-/* 接続ハンドルはバー右端の少し外側。既定は不可視で、バーのホバー/フォーカス時だけ触れる */
+/* 接続ハンドルはバー端の少し外側。既定は不可視で、バーのホバー/フォーカス時だけ触れる。
+   右端(end)=後続を張る順方向、左端(start)=先行を張る逆方向。 */
 .gantt-link-handle {
   fill: var(--accent);
   stroke: var(--surface);
@@ -823,6 +845,12 @@ body.is-gantt-resizing * {
 .gantt-bar-group:focus-within .gantt-link-handle {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* 左端ハンドル(逆方向=先行タスクを設定)。塗りを反転(中抜き)して右端と区別する */
+.gantt-link-handle.start {
+  fill: var(--surface);
+  stroke: var(--accent);
 }
 
 /* ドラッグ中の点線(始点=ハンドル、終点=ポインタ)。有効な向きならアクセント色 */

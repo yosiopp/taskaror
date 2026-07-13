@@ -19,6 +19,7 @@ import Toolbar from './components/Toolbar'
 import type { ViewMode } from './components/Toolbar'
 import TaskGrid from './components/TaskGrid'
 import GanttChart from './components/GanttChart'
+import type { DependencyRef } from './components/GanttChart'
 import PaneSeparator from './components/PaneSeparator'
 import YamlView from './components/YamlView'
 import WbsTable from './components/WbsTable'
@@ -376,6 +377,11 @@ function App() {
   const spec = history.present
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // 選択中の依存線(先行→後続の 1 本)。タスク選択(selectedId)とは相互排他にする。
+  // グローバルの Delete が「選択タスク削除」と競合するため、依存線選択も App にリフトして
+  // 一元管理し、削除の優先順位(依存線 > タスク)をここで調停する。
+  const [selectedDependency, setSelectedDependency] =
+    useState<DependencyRef | null>(null)
   // 編集ダイアログの対象タスク id(null なら閉じている)
   const [dialogTaskId, setDialogTaskId] = useState<string | null>(null)
   // [ヘルプ] → [taskaror について] ダイアログの開閉
@@ -609,6 +615,20 @@ function App() {
     )
   }, [scrollMetrics, gridWidth, layout.days.length, layout.dayWidth])
 
+  // --- 選択(タスク ⇔ 依存線の相互排他) ---
+  // タスク(行・バー)を選択したら依存線選択を解除し、依存線を選択したらタスク選択を
+  // 解除する。どちらのセッターも identity 安定なので useCallback の依存は空でよい。
+  const selectTask = useCallback((id: string | null): void => {
+    setSelectedId(id)
+    setSelectedDependency(null)
+  }, [])
+
+  /** 依存線(矢印)クリックでの選択。タスク選択とは相互排他にする */
+  const handleSelectDependency = useCallback((dep: DependencyRef): void => {
+    setSelectedDependency(dep)
+    setSelectedId(null)
+  }, [])
+
   // --- 編集ハンドラ ---
   // handleAdd / handleRemove はキーボードショートカット(Insert / Delete)の
   // useEffect 依存に入るため、useCallback で安定化して不要な再購読を避ける。
@@ -616,8 +636,8 @@ function App() {
     const task = newTask(spec)
     const mode: AddMode = selectedId ? 'sibling-after' : 'root-append'
     dispatch({ type: 'addTask', task, mode, targetId: selectedId ?? undefined })
-    setSelectedId(task.id)
-  }, [spec, selectedId])
+    selectTask(task.id)
+  }, [spec, selectedId, selectTask])
 
   /**
    * ルート末尾に空タスクを作成して選択し、作成したタスクを返す。
@@ -627,7 +647,7 @@ function App() {
   const handleCreateTask = (): Task => {
     const task = newTask(spec)
     dispatch({ type: 'addTask', task, mode: 'root-append' })
-    setSelectedId(task.id)
+    selectTask(task.id)
     return task
   }
 
@@ -636,8 +656,8 @@ function App() {
     // 削除でフォーカス(選択)が消えないよう、削除前の表示行から移動先を決める
     const nextSelected = nextSelectionAfterRemoval(visibleRows, selectedId)
     dispatch({ type: 'removeTask', id: selectedId })
-    setSelectedId(nextSelected)
-  }, [selectedId, visibleRows])
+    selectTask(nextSelected)
+  }, [selectedId, visibleRows, selectTask])
 
   const handleIndent = (): void => {
     if (selectedId) dispatch({ type: 'indentTask', id: selectedId })
@@ -656,7 +676,7 @@ function App() {
     position: DropPosition,
   ): void => {
     dispatch({ type: 'moveTaskTo', id, targetId, position })
-    setSelectedId(id)
+    selectTask(id)
   }
 
   const handleToggleCollapse = (id: string): void => {
@@ -674,7 +694,7 @@ function App() {
 
   /** ダブルクリックで編集ダイアログを開く(対象を選択もする) */
   const handleOpenDialog = (id: string): void => {
-    setSelectedId(id)
+    selectTask(id)
     setDialogTaskId(id)
   }
 
@@ -688,8 +708,25 @@ function App() {
     const succ = allTasks.find((flat) => flat.task.id === succId)?.task
     const depends = [...(succ?.depends ?? []), predId]
     dispatch({ type: 'updateTask', id: succId, changes: { depends } })
-    setSelectedId(succId)
+    selectTask(succId)
   }
+
+  /**
+   * 依存線の削除。後続タスク(succ)の depends から先行 id(pred)を外す。
+   * depends が空になれば updateTask 側でキー自体が消える(applyFieldChanges)。
+   * 削除後は依存線選択を解除する(参照先が消えるため)。
+   */
+  const handleUnlinkDependency = useCallback(
+    (predId: string, succId: string): void => {
+      const succ = allTasks.find((flat) => flat.task.id === succId)?.task
+      if (succ !== undefined) {
+        const depends = (succ.depends ?? []).filter((id) => id !== predId)
+        dispatch({ type: 'updateTask', id: succId, changes: { depends } })
+      }
+      setSelectedDependency(null)
+    },
+    [allTasks],
+  )
 
   // タスク操作のショートカット。undo/redo とは分けて張る。
   //  - 修飾なし: Insert=追加 / Delete=削除
@@ -705,9 +742,18 @@ function App() {
         if (event.key === 'Insert') {
           event.preventDefault()
           handleAdd()
-        } else if (event.key === 'Delete' && selectedId !== null) {
-          event.preventDefault()
-          handleRemove()
+        } else if (event.key === 'Delete') {
+          // 依存線選択を優先し、なければ選択タスクを削除する(両者は相互排他)
+          if (selectedDependency !== null) {
+            event.preventDefault()
+            handleUnlinkDependency(
+              selectedDependency.predId,
+              selectedDependency.succId,
+            )
+          } else if (selectedId !== null) {
+            event.preventDefault()
+            handleRemove()
+          }
         }
         return
       }
@@ -734,7 +780,15 @@ function App() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [viewMode, dialogTaskId, selectedId, handleAdd, handleRemove])
+  }, [
+    viewMode,
+    dialogTaskId,
+    selectedId,
+    selectedDependency,
+    handleAdd,
+    handleRemove,
+    handleUnlinkDependency,
+  ])
 
   // --- ファイル入出力 ---
 
@@ -749,7 +803,7 @@ function App() {
     // 新規作成では忠実性のベースを捨てる(以後は plain stringify)
     setBaseDoc(null)
     dispatch({ type: 'replaceSpec', spec: emptyTaskSpec() })
-    setSelectedId(null)
+    selectTask(null)
     setLoadError(null)
   }
 
@@ -822,7 +876,7 @@ function App() {
     }
     setBaseDoc(parsed.doc)
     dispatch({ type: 'replaceSpec', spec: parsed.spec })
-    setSelectedId(null)
+    selectTask(null)
     setLoadError(null)
   }
 
@@ -939,7 +993,7 @@ function App() {
               allTasks={allTasks}
               selectedId={selectedId}
               gridWidth={gridWidth}
-              onSelect={setSelectedId}
+              onSelect={selectTask}
               onToggleCollapse={handleToggleCollapse}
               onUpdate={handleUpdate}
               onMove={handleMoveTask}
@@ -950,9 +1004,11 @@ function App() {
               layout={layout}
               dayWindow={dayWindow}
               selectedId={selectedId}
+              selectedDependency={selectedDependency}
               criticalIds={criticalIds}
               showCritical={showCriticalPath}
-              onSelectBar={setSelectedId}
+              onSelectBar={selectTask}
+              onSelectDependency={handleSelectDependency}
               onUpdateTask={handleUpdate}
               onLinkDependency={handleLinkDependency}
               canLinkDependency={canLinkDependency}
@@ -974,7 +1030,7 @@ function App() {
             // (以後の GUI 編集はこのテキスト基準で忠実性 reconcile される)
             setBaseDoc(doc)
             dispatch({ type: 'replaceSpec', spec: next })
-            setSelectedId(null)
+            selectTask(null)
           }}
         />
       ) : (

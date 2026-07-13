@@ -17,6 +17,17 @@ import {
 import type { TaskFields } from '../lib/editor'
 import { HEADER_HEIGHT, MONTH_BAND_HEIGHT } from './constants'
 
+/** 選択中の依存線(先行→後続の 1 本)。相互排他のため App で一元管理する */
+export interface DependencyRef {
+  /** 先行タスク id(depends に載る側) */
+  predId: string
+  /** 後続タスク id(depends を持つ側) */
+  succId: string
+}
+
+/** 接続ハンドルの側。end=バー右端(後続を張る)/ start=バー左端(先行を張る) */
+type LinkSide = 'start' | 'end'
+
 export interface GanttChartProps {
   layout: GanttLayout
   /**
@@ -27,12 +38,16 @@ export interface GanttChartProps {
   dayWindow?: DayWindow | null
   /** 選択中タスク id(該当バーを強調) */
   selectedId: string | null
+  /** 選択中の依存線(該当矢印を強調)。タスク選択とは相互排他 */
+  selectedDependency: DependencyRef | null
   /** クリティカルパス上のタスク id 集合(該当バー・矢印を強調) */
   criticalIds: ReadonlySet<string>
   /** クリティカルパスの強調表示が ON か */
   showCritical: boolean
   /** バークリック・キーボードでの行選択に連動 */
   onSelectBar: (id: string) => void
+  /** 依存線(矢印)クリックでの選択。App でタスク選択と相互排他に調停する */
+  onSelectDependency: (dep: DependencyRef) => void
   /** バードラッグ・キーボードでの start / estimate 変更を反映する */
   onUpdateTask: (id: string, changes: Partial<TaskFields>) => void
   /** 依存線ドラッグ確定: predId(先行)→ succId(後続。succ.depends に pred を足す) */
@@ -54,24 +69,53 @@ interface LinkPreview {
 }
 
 /**
- * 接続ハンドル(半径 LINK_HANDLE_RADIUS の円)の中心をバー右端からどれだけ
+ * 接続ハンドル(半径 LINK_HANDLE_RADIUS の円)の中心をバー端からどれだけ
  * 外側に出すか(px)。ハンドルは非ホバー時 pointer-events:none のため、バーとの間に
  * 隙間があるとホバーの連鎖が切れて掴めなくなる。半径未満のオフセットにして
- * ハンドル左端をバー右端に重ねる(隙間ゼロ)ことで、バーからそのまま掴める。
+ * ハンドルの内側をバー端に重ねる(隙間ゼロ)ことで、バーからそのまま掴める。
  */
 const LINK_HANDLE_RADIUS = 4
 const LINK_HANDLE_OFFSET = 3
 
 const DAY_BAND_HEIGHT = HEADER_HEIGHT - MONTH_BAND_HEIGHT
 
+/**
+ * 接続ハンドルの側(side)から依存の向き(先行 pred → 後続 succ)を決める。
+ * - end(バー右端): ドラッグ元が先行・ドラッグ先が後続(後続へ伸ばす順方向)
+ * - start(バー左端): ドラッグ先が先行・ドラッグ元が後続(先行から引く逆方向)
+ * どちらの向きでも可否判定・確定は同じ (predId, succId) の形に正規化して扱う。
+ */
+function linkPair(
+  fromId: string,
+  targetId: string,
+  side: LinkSide,
+): DependencyRef {
+  return side === 'end'
+    ? { predId: fromId, succId: targetId }
+    : { predId: targetId, succId: fromId }
+}
+
+/** バー端(接続ハンドルの付く位置)の X 座標。milestone はひし形の左右頂点 */
+function edgeX(row: GanttRowLayout, side: LinkSide): number {
+  if (side === 'end') {
+    const right =
+      row.kind === 'milestone' ? row.cx + row.barHeight / 2 : row.x + row.width
+    return right + LINK_HANDLE_OFFSET
+  }
+  const left = row.kind === 'milestone' ? row.cx - row.barHeight / 2 : row.x
+  return left - LINK_HANDLE_OFFSET
+}
+
 function GanttChart(props: GanttChartProps) {
   const {
     layout,
     dayWindow,
     selectedId,
+    selectedDependency,
     criticalIds,
     showCritical,
     onSelectBar,
+    onSelectDependency,
     onUpdateTask,
     onLinkDependency,
     canLinkDependency,
@@ -83,10 +127,21 @@ function GanttChart(props: GanttChartProps) {
 
   // --- 依存線ドラッグ(バー端ハンドル → 対象バー) ---
   // 座標変換のため本文 SVG の参照を持つ。ドラッグ中の始点は ref、描画用は state。
+  // linkSideRef はどちら端のハンドルから始めたか(end=後続へ / start=先行から)を保持し、
+  // 可否判定・確定時に依存の向き(pred/succ)へ正規化するのに使う。
   const bodyRef = useRef<SVGSVGElement>(null)
   const linkFromRef = useRef<string | null>(null)
+  const linkSideRef = useRef<LinkSide>('end')
   const [linking, setLinking] = useState(false)
   const [linkPreview, setLinkPreview] = useState<LinkPreview | null>(null)
+  // linkPreview の最新値をイベントハンドラ(render 外)から読むためのミラー。
+  // 確定時に親コールバックを setState 更新関数の中で呼ぶと「レンダー中に別コンポーネントを
+  // 更新した」警告になるため、ここから読んで更新関数の外で呼ぶ。
+  const linkPreviewRef = useRef<LinkPreview | null>(null)
+  const setPreview = (next: LinkPreview | null): void => {
+    linkPreviewRef.current = next
+    setLinkPreview(next)
+  }
 
   // window リスナは linking の間だけ張る(下の effect)。その中で参照する
   // layout / 判定コールバックは毎レンダーで identity が変わるため、ref 経由で
@@ -103,23 +158,18 @@ function GanttChart(props: GanttChartProps) {
 
   const rowById = new Map(layout.rows.map((row) => [row.id, row]))
 
-  // 接続ハンドル(バー右端に接する位置)の座標
-  const handlePos = (row: GanttRowLayout): { x: number; y: number } => {
-    const rightEdge =
-      row.kind === 'milestone' ? row.cx + row.barHeight / 2 : row.x + row.width
-    return { x: rightEdge + LINK_HANDLE_OFFSET, y: row.cy }
-  }
-
-  const startLink = (fromId: string): void => {
+  // 接続ハンドルを掴んだら依存線ドラッグを開始する。side でどちら端かを覚えておく。
+  const startLink = (fromId: string, side: LinkSide): void => {
     const row = rowById.get(fromId)
     if (row === undefined) return
-    const pos = handlePos(row)
+    const x = edgeX(row, side)
     linkFromRef.current = fromId
-    setLinkPreview({
-      fromX: pos.x,
-      fromY: pos.y,
-      toX: pos.x,
-      toY: pos.y,
+    linkSideRef.current = side
+    setPreview({
+      fromX: x,
+      fromY: row.cy,
+      toX: x,
+      toY: row.cy,
       targetId: null,
       valid: false,
     })
@@ -133,25 +183,28 @@ function GanttChart(props: GanttChartProps) {
     if (!linking) return
     const finish = (commit: boolean): void => {
       const fromId = linkFromRef.current
-      setLinkPreview((prev) => {
-        if (
-          commit &&
-          prev &&
-          fromId !== null &&
-          prev.targetId !== null &&
-          prev.valid
-        ) {
-          onLinkRef.current(fromId, prev.targetId)
-        }
-        return null
-      })
+      const side = linkSideRef.current
+      // 確定情報は ref から読み、preview を閉じてから(= 更新関数の外で)親を呼ぶ
+      const preview = linkPreviewRef.current
       linkFromRef.current = null
+      setPreview(null)
       setLinking(false)
+      if (
+        commit &&
+        preview &&
+        fromId !== null &&
+        preview.targetId !== null &&
+        preview.valid
+      ) {
+        const pair = linkPair(fromId, preview.targetId, side)
+        onLinkRef.current(pair.predId, pair.succId)
+      }
     }
     const handleMove = (event: globalThis.PointerEvent): void => {
       const svg = bodyRef.current
       const fromId = linkFromRef.current
-      if (svg === null || fromId === null) return
+      const prev = linkPreviewRef.current
+      if (svg === null || fromId === null || prev === null) return
       const layout = layoutRef.current
       const rect = svg.getBoundingClientRect()
       const toX = event.clientX - rect.left
@@ -162,10 +215,14 @@ function GanttChart(props: GanttChartProps) {
         ? layout.rows[Math.floor(toY / layout.rowHeight)]
         : undefined
       const targetId = target && target.id !== fromId ? target.id : null
-      const valid = targetId !== null && canLinkRef.current(fromId, targetId)
-      setLinkPreview((prev) =>
-        prev ? { ...prev, toX, toY, targetId, valid } : prev,
-      )
+      // side に応じて (pred, succ) へ正規化してから可否判定する
+      const pair =
+        targetId !== null
+          ? linkPair(fromId, targetId, linkSideRef.current)
+          : null
+      const valid =
+        pair !== null && canLinkRef.current(pair.predId, pair.succId)
+      setPreview({ ...prev, toX, toY, targetId, valid })
     }
     const handleUp = (): void => finish(true)
     const handleKey = (event: globalThis.KeyboardEvent): void => {
@@ -294,6 +351,17 @@ function GanttChart(props: GanttChartProps) {
             >
               <path className="gantt-arrowhead-critical" d="M0,0 L6,3 L0,6 Z" />
             </marker>
+            <marker
+              id="gantt-arrowhead-selected"
+              markerWidth="8"
+              markerHeight="8"
+              refX="6"
+              refY="3"
+              orient="auto"
+              markerUnits="userSpaceOnUse"
+            >
+              <path className="gantt-arrowhead-selected" d="M0,0 L6,3 L0,6 Z" />
+            </marker>
           </defs>
 
           {/* 週末列のシェード */}
@@ -333,20 +401,42 @@ function GanttChart(props: GanttChartProps) {
             />
           ) : null}
 
-          {/* 依存矢印(両端がクリティカルなら強調) */}
+          {/* 依存矢印(両端がクリティカルなら強調 / 選択中はアクセント色で太く)。
+              当たり判定が細くて掴みにくいので、透明で太いヒットラインを重ねて
+              クリックで選択できるようにする(選択はクリティカル強調より優先表示)。 */}
           {layout.arrows.map((arrow) => {
             const critical = isCritical(arrow.fromId) && isCritical(arrow.toId)
+            const selected =
+              selectedDependency !== null &&
+              selectedDependency.predId === arrow.fromId &&
+              selectedDependency.succId === arrow.toId
+            const points = arrow.points.map((p) => `${p.x},${p.y}`).join(' ')
+            const stateClass =
+              (critical ? ' critical' : '') + (selected ? ' selected' : '')
+            const markerEnd = selected
+              ? 'url(#gantt-arrowhead-selected)'
+              : critical
+                ? 'url(#gantt-arrowhead-critical)'
+                : 'url(#gantt-arrowhead)'
             return (
-              <polyline
-                key={`a-${arrow.fromId}-${arrow.toId}`}
-                className={critical ? 'gantt-arrow critical' : 'gantt-arrow'}
-                points={arrow.points.map((p) => `${p.x},${p.y}`).join(' ')}
-                markerEnd={
-                  critical
-                    ? 'url(#gantt-arrowhead-critical)'
-                    : 'url(#gantt-arrowhead)'
-                }
-              />
+              <g key={`a-${arrow.fromId}-${arrow.toId}`}>
+                <polyline
+                  className={`gantt-arrow${stateClass}`}
+                  points={points}
+                  markerEnd={markerEnd}
+                />
+                <polyline
+                  className="gantt-arrow-hit"
+                  points={points}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onSelectDependency({
+                      predId: arrow.fromId,
+                      succId: arrow.toId,
+                    })
+                  }}
+                />
+              </g>
             )
           })}
 
@@ -387,8 +477,11 @@ interface BarProps {
   dayWidth: number
   onSelect: (id: string) => void
   onUpdateTask: (id: string, changes: Partial<TaskFields>) => void
-  /** 接続ハンドルの押下で依存線ドラッグを開始する(このバーを先行タスクにする) */
-  onStartLink: (fromId: string) => void
+  /**
+   * 接続ハンドルの押下で依存線ドラッグを開始する。
+   * side=end(右端)はこのバーを先行に、start(左端)はこのバーを後続にする。
+   */
+  onStartLink: (fromId: string, side: LinkSide) => void
 }
 
 /** ドラッグの種別。move = バー本体(start 変更)、resize = 右端(estimate 変更) */
@@ -535,24 +628,28 @@ function Bar({
       }
     : {}
 
-  // 依存線ドラッグの接続ハンドル(バー右端の少し外側)。ホバー/フォーカス時だけ触れる
-  const linkHandleX =
-    (row.kind === 'milestone'
-      ? row.cx + row.barHeight / 2
-      : row.x + row.width) + LINK_HANDLE_OFFSET
-  const linkHandle = (
+  // 依存線ドラッグの接続ハンドル。ホバー/フォーカス時だけ触れる(CSS 制御)。
+  //  - end(右端): ドラッグ先を後続にする(順方向。塗りつぶし円)
+  //  - start(左端): ドラッグ先を先行にする(逆方向。中抜き円で区別)
+  const linkHandle = (side: LinkSide) => (
     <circle
-      className="gantt-link-handle"
-      cx={linkHandleX}
+      className={`gantt-link-handle ${side}`}
+      cx={edgeX(row, side)}
       cy={row.cy}
       r={LINK_HANDLE_RADIUS}
       aria-hidden="true"
       onPointerDown={(event) => {
         event.stopPropagation()
         event.preventDefault()
-        onStartLink(row.id)
+        onStartLink(row.id, side)
       }}
-    />
+    >
+      <title>
+        {side === 'end'
+          ? 'ドラッグして後続タスクを設定'
+          : 'ドラッグして先行タスクを設定'}
+      </title>
+    </circle>
   )
 
   if (row.kind === 'milestone') {
@@ -576,7 +673,8 @@ function Bar({
           onPointerDown={(event) => beginDrag('move', event)}
           {...pointerHandlers}
         />
-        {linkHandle}
+        {linkHandle('start')}
+        {linkHandle('end')}
       </g>
     )
   }
@@ -600,7 +698,8 @@ function Bar({
           onClick={() => onSelect(row.id)}
           onKeyDown={handleKeyDown}
         />
-        {linkHandle}
+        {linkHandle('start')}
+        {linkHandle('end')}
       </g>
     )
   }
@@ -643,7 +742,8 @@ function Bar({
         onPointerDown={(event) => beginDrag('resize', event)}
         {...pointerHandlers}
       />
-      {linkHandle}
+      {linkHandle('start')}
+      {linkHandle('end')}
     </g>
   )
 }

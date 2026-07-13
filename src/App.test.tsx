@@ -4,7 +4,7 @@
  * 描画パイプラインの最小確認(SSR)は App.smoke.test.tsx が担当し、
  * こちらは「操作 → 画面の変化」という UI の振る舞いを対象にする。
  */
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from './App'
@@ -123,7 +123,9 @@ describe('App の UI', () => {
     expect(link).toHaveAttribute('target', '_blank')
 
     // [taskaror について] を開くとバージョンが表示される
-    await user.click(screen.getByRole('menuitem', { name: 'taskaror について' }))
+    await user.click(
+      screen.getByRole('menuitem', { name: 'taskaror について' }),
+    )
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText(/バージョン/)).toBeInTheDocument()
   })
@@ -228,5 +230,109 @@ describe('App の UI', () => {
     await user.keyboard('a')
     expect(taskRowCount()).toBe(before + 1)
     expect(screen.getByDisplayValue('a')).toBeInTheDocument()
+  })
+
+  // --- ガントチャート: 依存線の選択・削除、逆方向の接続ハンドル ---
+  // SVG のポインタドラッグは jsdom で完全再現しにくいため、ここでは
+  // 「依存線のクリック選択 → Delete 削除」「タスク選択と依存線選択の相互排他」
+  // という検証可能な振る舞いを中心にカバーする。
+
+  it('依存線をクリックで選択し、Delete でその依存を削除できる', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    // サンプルは implementation が design に依存する 1 本の依存線を持つ
+    const hits = document.querySelectorAll('.gantt-arrow-hit')
+    expect(hits.length).toBe(1)
+    expect(document.querySelector('.gantt-arrow.selected')).toBeNull()
+
+    // 透明ヒットラインをクリックすると依存線が選択状態になる
+    fireEvent.click(hits[0])
+    expect(document.querySelector('.gantt-arrow.selected')).not.toBeNull()
+
+    // Delete で依存参照が外れ、矢印(と依存線)が消える
+    await user.keyboard('{Delete}')
+    expect(document.querySelectorAll('.gantt-arrow-hit').length).toBe(0)
+    expect(document.querySelector('.gantt-arrow.selected')).toBeNull()
+  })
+
+  it('タスク選択と依存線選択は相互排他になる', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    // 先頭のタスク行(グリッド)をクリックして選択する
+    const firstRow = document.querySelector(
+      '.grid-row:not(.grid-row-empty)',
+    ) as HTMLElement
+    await user.click(firstRow)
+    expect(document.querySelector('.grid-row.selected')).not.toBeNull()
+
+    // 依存線を選択するとタスク選択が解除される(依存線が選択に、行選択が解除)
+    fireEvent.click(document.querySelector('.gantt-arrow-hit') as Element)
+    expect(document.querySelector('.gantt-arrow.selected')).not.toBeNull()
+    expect(document.querySelector('.grid-row.selected')).toBeNull()
+
+    // 逆に、タスクを選び直すと依存線選択が解除される
+    await user.click(firstRow)
+    expect(document.querySelector('.grid-row.selected')).not.toBeNull()
+    expect(document.querySelector('.gantt-arrow.selected')).toBeNull()
+  })
+
+  it('依存線選択中でなければ Delete は従来どおり選択タスクを削除する', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    // Insert で末尾に新規タスクを追加(選択される)。依存線は未選択のまま
+    await user.keyboard('{Insert}')
+    expect(screen.getByText('新しいタスク')).toBeInTheDocument()
+
+    // 依存線選択が無いので Delete は選択タスク削除にフォールバックする
+    await user.keyboard('{Delete}')
+    expect(screen.queryByText('新しいタスク')).not.toBeInTheDocument()
+    // 既存の依存線は削除されず残っている
+    expect(document.querySelectorAll('.gantt-arrow-hit').length).toBe(1)
+  })
+
+  it('各バーに先行(左端)・後続(右端)の接続ハンドルが両方描画される', () => {
+    render(<App />)
+    // 左端(start=先行を張る)と右端(end=後続を張る)のハンドルが同数だけ出る
+    const starts = document.querySelectorAll('.gantt-link-handle.start')
+    const ends = document.querySelectorAll('.gantt-link-handle.end')
+    expect(starts.length).toBeGreaterThan(0)
+    expect(starts.length).toBe(ends.length)
+  })
+
+  it('左端ハンドルからのドラッグで逆方向(後続→先行)の依存を設定できる', () => {
+    render(<App />)
+
+    // 初期の依存線は 1 本(design → implementation)
+    expect(document.querySelectorAll('.gantt-arrow-hit').length).toBe(1)
+
+    // api バーの左端ハンドル(start)を掴み、db の行へドラッグして離す。
+    // これは「api(後続)→ db(先行)」の逆方向定義で、api.depends に db を足す。
+    const apiBar = document.querySelector('[data-gantt-bar="api"]')
+    const group = apiBar?.closest('.gantt-bar-group')
+    const startHandle = group?.querySelector(
+      '.gantt-link-handle.start',
+    ) as Element
+
+    // jsdom では SVG の getBoundingClientRect が原点を返すので、clientY をそのまま
+    // 行インデックス(ROW_HEIGHT=34)に対応させられる。db は 3 番目の表示行(index 2)。
+    fireEvent.pointerDown(startHandle)
+    fireEvent.pointerMove(window, { clientX: 40, clientY: 34 * 2 + 10 })
+    fireEvent.pointerUp(window)
+
+    // 依存線が 2 本になり、api の依存セルに db が表示される
+    expect(document.querySelectorAll('.gantt-arrow-hit').length).toBe(2)
+    const apiRow = document
+      .querySelector('[data-gantt-bar="api"]')
+      ?.closest('.gantt-bar-group')
+    expect(apiRow).not.toBeNull()
+    const apiGridRow = Array.from(
+      document.querySelectorAll('.grid-row:not(.grid-row-empty)'),
+    ).find((row) => within(row as HTMLElement).queryByText('API設計'))
+    expect(apiGridRow?.querySelector('.depends-button')?.textContent).toContain(
+      'db',
+    )
   })
 })
