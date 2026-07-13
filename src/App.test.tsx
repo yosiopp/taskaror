@@ -4,7 +4,7 @@
  * 描画パイプラインの最小確認(SSR)は App.smoke.test.tsx が担当し、
  * こちらは「操作 → 画面の変化」という UI の振る舞いを対象にする。
  */
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from './App'
@@ -100,6 +100,22 @@ describe('App の UI', () => {
     expect(
       screen.getByRole('button', { name: 'アウトデント' }),
     ).toHaveAttribute('title', 'アウトデント(Ctrl+←)')
+  })
+
+  it('タスクの行をダブルクリックすると編集ダイアログが開き依存リストが出る', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    // 行そのものをダブルクリック(セルの上でなければインライン編集にならない)
+    const firstRow = document.querySelector('.grid-row')
+    expect(firstRow).not.toBeNull()
+    await user.dblClick(firstRow as Element)
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('タスクの編集')).toBeInTheDocument()
+    // 依存(先行タスク)セクションが描画され、候補はチェックボックスで表示される
+    expect(within(dialog).getByText('依存(先行タスク)')).toBeInTheDocument()
+    expect(within(dialog).getAllByRole('checkbox').length).toBeGreaterThan(0)
   })
 
   it('Ctrl+↑ で選択タスクを上に移動できる', async () => {

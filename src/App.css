@@ -888,11 +888,15 @@ body.is-gantt-linking * {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 700;
+  /* 継承する line-height 1.6 の余白でベースラインがずれて見えるため、
+     行ボックスを詰めて id と上下中央で揃える(CJK が欠けない範囲で) */
+  line-height: 1.2;
 }
 
 .task-dialog-id {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 0.75rem;
+  line-height: 1.2;
   color: var(--text-muted);
 }
 
@@ -936,7 +940,8 @@ body.is-gantt-linking * {
   color: var(--text-muted);
 }
 
-.task-field input,
+/* テキスト系の入力欄のみ全幅・枠付きにする(依存のチェックボックスは除外) */
+.task-field input:not([type='checkbox']),
 .task-field textarea {
   width: 100%;
   padding: 0.35rem 0.5rem;
@@ -948,7 +953,7 @@ body.is-gantt-linking * {
   border-radius: 6px;
 }
 
-.task-field input:focus,
+.task-field input:not([type='checkbox']):focus,
 .task-field textarea:focus {
   outline: none;
   border-color: var(--accent);
@@ -982,11 +987,18 @@ body.is-gantt-linking * {
 .task-depends-list label {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.4rem;
   padding: 0.2rem 0.3rem;
   font-size: 0.8125rem;
   cursor: pointer;
   border-radius: 4px;
+}
+
+/* チェックボックスは素のサイズで左端に固定する */
+.task-depends-list input[type='checkbox'] {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .task-depends-list label:hover {
@@ -1000,6 +1012,8 @@ body.is-gantt-linking * {
 }
 
 .task-depends-title {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
