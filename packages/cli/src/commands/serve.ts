@@ -9,6 +9,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import type { Command } from '../cli'
+import { isErrnoException } from '../errno'
 
 /** 既定の待ち受けポート */
 const DEFAULT_PORT = 5173
@@ -38,10 +39,6 @@ function respondText(
 ): void {
   res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8' })
   res.end(`${message}\n`)
-}
-
-function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
-  return err instanceof Error && 'code' in err
 }
 
 /** ファイル不在系(フォールバック・404 の対象)のエラーコードか */

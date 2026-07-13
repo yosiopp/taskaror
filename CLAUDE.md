@@ -45,6 +45,7 @@ docker run --rm -p 5173:5173 taskaror serve  # CLI イメージで GUI を配信
 - **ドキュメント** — `docs/` 配下に必要なドキュメントを整備し、実装と docs を同期させながら更新する
 - **テスト** — 必要ならテストコードも書く(コアロジックは原則テストを書く)
 - **タスク完了の条件** — 実装が終わったら動作確認(実際に動かす・テスト実行)をしてから、tasks.md の該当タスクにチェックをつける
+- **バージョン** — リリース時は root・packages/web・packages/cli の package.json の version を揃えて上げる(GUI 表示は web の version、CLI の --version は cli の version を使う)
 
 ## アーキテクチャ
 

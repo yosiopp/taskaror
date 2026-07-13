@@ -14,6 +14,8 @@ import {
   type ScheduleOptions,
   type TaskStartFloor,
 } from './schedule'
+import { collectTaskNodes } from './taskspec'
+import type { TaskNode } from './taskspec'
 import { adjustToBusinessDay, formatDate, isWeekend, parseDate } from './date'
 
 export type LintSeverity = 'warning' | 'info'
@@ -31,13 +33,8 @@ export interface LintIssue {
   message: string
 }
 
-/** lint 対象のタスク 1 件(位置と祖先 id 付き) */
-interface LintNode {
-  task: Task
-  path: string
-  /** ルートから親までの祖先タスクの id */
-  ancestorIds: ReadonlySet<string>
-}
+/** lint 対象のタスク 1 件(位置と祖先 id 付き)。taskspec.ts の TaskNode を共用する */
+type LintNode = TaskNode
 
 /**
  * TaskSpec を lint し、指摘を文書順(タスク順 → ルール順)で返す。
@@ -47,7 +44,7 @@ export function lintTaskSpec(
   spec: TaskSpec,
   options: ScheduleOptions = {},
 ): LintIssue[] {
-  const nodes = collectNodes(spec.tasks)
+  const nodes = collectTaskNodes(spec.tasks)
   const nodeById = new Map(nodes.map((node) => [node.task.id, node]))
   const floors = computeStartFloors(spec, options)
 
@@ -61,25 +58,6 @@ export function lintTaskSpec(
     checkWeekendStart(node, issues)
   }
   return issues
-}
-
-/** タスク階層をパス・祖先 id 付きで平坦化する */
-function collectNodes(
-  tasks: Task[],
-  base = 'tasks',
-  ancestorIds: ReadonlySet<string> = new Set(),
-): LintNode[] {
-  return tasks.flatMap((task, index) => {
-    const path = `${base}[${index}]`
-    const children = task.tasks?.length
-      ? collectNodes(
-          task.tasks,
-          `${path}.tasks`,
-          new Set([...ancestorIds, task.id]),
-        )
-      : []
-    return [{ task, path, ancestorIds }, ...children]
-  })
 }
 
 function push(

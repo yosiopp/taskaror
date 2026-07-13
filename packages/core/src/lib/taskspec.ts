@@ -60,3 +60,34 @@ export function flattenTasks(tasks: Task[], depth = 0): FlatTask[] {
     ...flattenTasks(task.tasks ?? [], depth + 1),
   ])
 }
+
+/** タスク階層の 1 ノード(YAML ドキュメント上の位置・祖先 id 付き) */
+export interface TaskNode {
+  task: Task
+  /** YAML ドキュメント上の位置(例: tasks[0].tasks[1]) */
+  path: string
+  /** ルートから親までの祖先タスクの id */
+  ancestorIds: ReadonlySet<string>
+}
+
+/**
+ * タスク階層を文書順(pre-order)で位置パス・祖先 id 付きで平坦化する。
+ * validate / lint が指摘の位置表示(tasks[i].tasks[j])に使う。
+ */
+export function collectTaskNodes(
+  tasks: Task[],
+  base = 'tasks',
+  ancestorIds: ReadonlySet<string> = new Set(),
+): TaskNode[] {
+  return tasks.flatMap((task, index) => {
+    const path = `${base}[${index}]`
+    const children = task.tasks?.length
+      ? collectTaskNodes(
+          task.tasks,
+          `${path}.tasks`,
+          new Set([...ancestorIds, task.id]),
+        )
+      : []
+    return [{ task, path, ancestorIds }, ...children]
+  })
+}

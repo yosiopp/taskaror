@@ -1,26 +1,10 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.cli.tsbuildinfo",
-    "target": "es2023",
-    "lib": ["ES2023"],
-    "module": "esnext",
-    "types": ["node"],
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-
-    /* Bundler mode(@taskaror/core の .ts exports を解決するため) */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    // Node.js 上で動く CLI。moduleResolution は @taskaror/core の .ts exports を
+    // 解決するため base の bundler をそのまま使う
+    "types": ["node"]
   },
   "include": ["src"]
 }

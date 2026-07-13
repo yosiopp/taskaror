@@ -19,8 +19,9 @@ await build({
   target: 'node20',
   // npm の bin として直接実行できるように shebang を付与する
   banner: { js: '#!/usr/bin/env node' },
-  // __dirname が使えない環境(Vitest / ESM)向けのフォールバックで import.meta を参照しているが、
-  // CJS バンドルの実行時は必ず __dirname 側が使われるため、この警告は抑止する
+  // serve.ts の ownDir が __dirname の使えない環境(Vitest / ESM)向けフォールバックで
+  // import.meta を参照しているが、CJS バンドルの実行時は必ず __dirname 側が使われるため、
+  // この警告は抑止する
   logOverride: { 'empty-import-meta': 'silent' },
 })
 

@@ -2,7 +2,9 @@ import Ajv2020 from 'ajv/dist/2020'
 import type { ErrorObject, ValidateFunction } from 'ajv/dist/2020'
 import addFormats from 'ajv-formats'
 import schema from '../../../../schema/1.0/taskspec.schema.json'
-import type { Task, TaskSpec } from '../types/taskspec'
+import type { TaskSpec } from '../types/taskspec'
+import { collectTaskNodes } from './taskspec'
+import type { TaskNode } from './taskspec'
 
 /**
  * 検証で見つかった 1 件の問題。
@@ -41,7 +43,7 @@ export function validateSchema(data: unknown): ValidationIssue[] {
  * 型として妥当な TaskSpec を前提とする。将来の CLI validator でもそのまま再利用する。
  */
 export function validateStructure(spec: TaskSpec): ValidationIssue[] {
-  const nodes = collectTasks(spec.tasks)
+  const nodes = collectTaskNodes(spec.tasks)
   return [
     ...checkDuplicateIds(nodes),
     ...checkDependencyRefs(nodes),
@@ -155,19 +157,8 @@ function joinPath(base: string, key: string): string {
 }
 
 // --- 構造検証 ---
-
-interface TaskNode {
-  task: Task
-  path: string
-}
-
-/** タスク階層をパス付きで平坦化する */
-function collectTasks(tasks: Task[], base = 'tasks'): TaskNode[] {
-  return tasks.flatMap((task, index) => {
-    const path = `${base}[${index}]`
-    return [{ task, path }, ...collectTasks(task.tasks ?? [], `${path}.tasks`)]
-  })
-}
+// タスクの平坦化(位置パス付き)は taskspec.ts の collectTaskNodes を共用する
+// (ancestorIds はここでは使わない)。
 
 function checkDuplicateIds(nodes: TaskNode[]): ValidationIssue[] {
   const seen = new Set<string>()

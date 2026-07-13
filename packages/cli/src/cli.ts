@@ -1,7 +1,6 @@
 // taskaror CLI のディスパッチ(コマンド振り分け・ヘルプ・バージョン表示)。
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+// バージョンは package.json からビルド時(esbuild のバンドル)に焼き込まれる
+import packageJson from '../package.json'
 import { lintCommand } from './commands/lint'
 import { serveCommand } from './commands/serve'
 import { svgCommand } from './commands/svg'
@@ -23,22 +22,6 @@ const commands: Record<string, Command> = {
   svg: svgCommand,
 }
 
-/** 自パッケージのディレクトリを返す */
-function ownDir(): string {
-  // esbuild で CJS にバンドルした実行時は __dirname(= dist/)が使える。
-  // Vitest(ESM)からソースを直接実行する場合は import.meta.url(= src/)から求める。
-  return typeof __dirname === 'string'
-    ? __dirname
-    : path.dirname(fileURLToPath(import.meta.url))
-}
-
-/** 自パッケージの package.json からバージョンを実行時に読む */
-function ownVersion(): string {
-  const pkgPath = path.join(ownDir(), '..', 'package.json')
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }
-  return pkg.version
-}
-
 /** 使い方(ヘルプ)の文面を組み立てる */
 export function usage(): string {
   const names = Object.keys(commands)
@@ -49,7 +32,9 @@ export function usage(): string {
   return [
     '使い方: taskaror <コマンド> [オプション]',
     '',
-    ...(commandLines.length > 0 ? ['コマンド:', ...commandLines, ''] : []),
+    'コマンド:',
+    ...commandLines,
+    '',
     'オプション:',
     '  -h, --help     この使い方を表示する',
     '  -v, --version  バージョンを表示する',
@@ -68,7 +53,7 @@ export async function runCli(argv: string[]): Promise<number> {
     return 0
   }
   if (first === '--version' || first === '-v') {
-    console.log(ownVersion())
+    console.log(packageJson.version)
     return 0
   }
   if (first.startsWith('-')) {

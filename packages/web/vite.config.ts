@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// [ヘルプ] の [taskaror について] で表示するバージョンは package.json の version を
-// 単一のソースとし、ビルド時に __APP_VERSION__ へ埋め込む(src/env.d.ts で型宣言)。
+// [ヘルプ] の [taskaror について] で表示するバージョンには web パッケージ
+// (packages/web/package.json)の version を使い、ビルド時に __APP_VERSION__ へ
+// 埋め込む(src/env.d.ts で型宣言)。CLI の --version は packages/cli の version を
+// 使うため、リリース時は root / web / cli の version を揃えて上げる(CLAUDE.md 参照)。
 const pkg = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
 ) as { version: string }

@@ -1,10 +1,12 @@
-// spec ファイル読み込みの共通処理。validate / svg(および後続の lint)で共用する。
+// spec ファイル読み込みの共通処理。validate / lint / svg で共用する。
 // ファイル読み込み → YAML パース(@taskaror/core の parseTaskSpec)までを担い、
 // 失敗はすべて日本語メッセージ付きの ok: false として返す(throw しない)。
 // web(App.tsx の loadFromText)と同じく、この後の検証は validateTaskSpec で行う。
 import { readFileSync } from 'node:fs'
 import { parseTaskSpec, TaskSpecError } from '@taskaror/core/taskspec'
+import { validateTaskSpec } from '@taskaror/core/validate'
 import type { TaskSpec } from '@taskaror/core/types/taskspec'
+import { isErrnoException } from './errno'
 
 /** spec ファイルの読み込み結果。失敗時は利用者向けの日本語メッセージを持つ */
 export type SpecFileResult =
@@ -29,12 +31,35 @@ export function loadSpecFile(filePath: string): SpecFileResult {
   }
 }
 
+/**
+ * spec ファイルを読み込み、validateTaskSpec の検証まで通す。
+ * 読み込み失敗は「ファイル: メッセージ」で表示し、検証の指摘があれば
+ * issuesHeader(件数)をヘッダに 1 件 1 行で列挙して、いずれも null を返す
+ * (ヘッダ文言はコマンドごとに異なるため呼び出し側で組み立てる)。
+ */
+export function loadValidatedSpec(
+  file: string,
+  issuesHeader: (count: number) => string,
+): TaskSpec | null {
+  const loaded = loadSpecFile(file)
+  if (!loaded.ok) {
+    console.error(`${file}: ${loaded.message}`)
+    return null
+  }
+  const issues = validateTaskSpec(loaded.spec)
+  if (issues.length > 0) {
+    console.error(issuesHeader(issues.length))
+    for (const issue of issues) {
+      console.error(`  ${issue.path}: ${issue.message}`)
+    }
+    return null
+  }
+  return loaded.spec
+}
+
 /** ファイル読み込みエラーを日本語メッセージにする */
 function describeReadError(err: unknown): string {
-  const code =
-    err instanceof Error && 'code' in err
-      ? (err as NodeJS.ErrnoException).code
-      : undefined
+  const code = isErrnoException(err) ? err.code : undefined
   switch (code) {
     case 'ENOENT':
       return 'ファイルが見つかりません'

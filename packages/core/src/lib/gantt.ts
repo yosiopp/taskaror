@@ -23,6 +23,13 @@ import type { ScheduledTask } from './schedule'
 
 const MS_PER_DAY = 86_400_000
 
+// レイアウト定数の既定値。web のガント表示(constants.ts で re-export)と
+// CLI の SVG 出力で共有し、見た目を揃える(値の定義はここに一元化する)。
+/** 1 暦日あたりの px 幅の既定値 */
+export const DEFAULT_DAY_WIDTH = 28
+/** 1 行あたりの px 高の既定値 */
+export const DEFAULT_ROW_HEIGHT = 34
+
 /** 表示行モデル。左グリッドと右ガントで共有し、行を揃えるための平坦化単位 */
 export interface GanttRow {
   scheduled: ScheduledTask
@@ -98,10 +105,10 @@ export function nextSelectionAfterRemoval(
 }
 
 export interface GanttLayoutOptions {
-  /** 1 暦日あたりの px 幅 */
-  dayWidth: number
-  /** 1 行あたりの px 高 */
-  rowHeight: number
+  /** 1 暦日あたりの px 幅(既定: DEFAULT_DAY_WIDTH) */
+  dayWidth?: number
+  /** 1 行あたりの px 高(既定: DEFAULT_ROW_HEIGHT) */
+  rowHeight?: number
   /** タスクバー高(既定: rowHeight の約 0.5、上下中央寄せ) */
   barHeight?: number
   /** 今日線の基準日(省略時は date.ts の today()) */
@@ -191,9 +198,10 @@ export interface GanttLayout {
  */
 export function computeGanttLayout(
   visibleRows: GanttRow[],
-  options: GanttLayoutOptions,
+  options: GanttLayoutOptions = {},
 ): GanttLayout {
-  const { dayWidth, rowHeight } = options
+  const dayWidth = options.dayWidth ?? DEFAULT_DAY_WIDTH
+  const rowHeight = options.rowHeight ?? DEFAULT_ROW_HEIGHT
   const paddingDays = options.paddingDays ?? 1
   const barHeight = options.barHeight ?? Math.round(rowHeight * 0.5)
 

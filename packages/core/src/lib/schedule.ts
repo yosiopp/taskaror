@@ -88,16 +88,8 @@ function createResolver(spec: TaskSpec, options: ScheduleOptions) {
   const effectiveFloor = (task: Task): Date => {
     if (task.start) return adjustToBusinessDay(parseDate(task.start))
     const inherited = inheritedFloor(task)
-    if (task.depends?.length) {
-      let floor = inherited
-      for (const depId of task.depends) {
-        const pred = taskById.get(depId)
-        if (pred === undefined) continue // 参照切れは validateStructure 側で報告する
-        floor = maxDate(floor, successorStart(pred))
-      }
-      return floor
-    }
-    return inherited
+    const latest = latestDepends(task)
+    return latest ? maxDate(inherited, latest.date) : inherited
   }
 
   const inheritedFloor = (task: Task): Date => {
@@ -109,6 +101,24 @@ function createResolver(spec: TaskSpec, options: ScheduleOptions) {
   const successorStart = (pred: Task): Date => {
     const end = resolveEnd(pred)
     return isMilestone(pred) ? end : addBusinessDays(end, 1)
+  }
+
+  // 自タスクの depends から導かれる開始下限(最も遅い先行とその successorStart)。
+  // 同日の先行が複数あるときは depends で先に現れたものを採用する。
+  // depends が無い・すべて参照切れなら undefined
+  const latestDepends = (
+    task: Task,
+  ): { date: Date; predecessorId: string } | undefined => {
+    let latest: { date: Date; predecessorId: string } | undefined
+    for (const depId of task.depends ?? []) {
+      const pred = taskById.get(depId)
+      if (pred === undefined) continue // 参照切れは validateStructure 側で報告する
+      const date = successorStart(pred)
+      if (latest === undefined || date.getTime() > latest.date.getTime()) {
+        latest = { date, predecessorId: depId }
+      }
+    }
+    return latest
   }
 
   const resolveStart = (task: Task): Date => {
@@ -139,7 +149,7 @@ function createResolver(spec: TaskSpec, options: ScheduleOptions) {
     hasChildren,
     isMilestone,
     inheritedFloor,
-    successorStart,
+    latestDepends,
     resolveStart,
     resolveEnd,
   }
@@ -183,33 +193,19 @@ export function computeStartFloors(
   const floors = new Map<Task, TaskStartFloor>()
   const walk = (tasks: Task[]): void => {
     for (const task of tasks) {
+      const latest = resolver.latestDepends(task)
       floors.set(task, {
         inherited: formatDate(resolver.inheritedFloor(task)),
-        depends: dependsFloor(task, resolver),
+        depends: latest && {
+          date: formatDate(latest.date),
+          predecessorId: latest.predecessorId,
+        },
       })
       if (task.tasks) walk(task.tasks)
     }
   }
   walk(spec.tasks)
   return floors
-}
-
-/** 自タスクの depends から導かれる開始下限(最も遅い先行の successorStart) */
-function dependsFloor(
-  task: Task,
-  resolver: ReturnType<typeof createResolver>,
-): TaskStartFloor['depends'] {
-  let latest: { date: Date; predecessorId: string } | undefined
-  for (const depId of task.depends ?? []) {
-    const pred = resolver.taskById.get(depId)
-    if (pred === undefined) continue // 参照切れは validateStructure 側で報告する
-    const date = resolver.successorStart(pred)
-    if (latest === undefined || date.getTime() > latest.date.getTime()) {
-      latest = { date, predecessorId: depId }
-    }
-  }
-  if (latest === undefined) return undefined
-  return { date: formatDate(latest.date), predecessorId: latest.predecessorId }
 }
 
 function resolveToday(value: ScheduleOptions['today']): Date {

@@ -84,8 +84,11 @@ const DEFAULT_FONT_FAMILY =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
 
 const DEFAULT_LABEL_WIDTH = 220
-const DEFAULT_HEADER_HEIGHT = 48
-const DEFAULT_MONTH_BAND_HEIGHT = 20
+// ヘッダ高の既定値。web のガント表示(constants.ts で re-export)とも共有する
+/** 時間軸ヘッダの px 高の既定値 */
+export const DEFAULT_HEADER_HEIGHT = 48
+/** ヘッダのうち月ラベル帯の px 高の既定値 */
+export const DEFAULT_MONTH_BAND_HEIGHT = 20
 
 /**
  * GanttLayout を自己完結した SVG 文字列に描画する。
