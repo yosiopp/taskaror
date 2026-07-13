@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-taskaror は、YAML ベースのタスク定義フォーマット **TaskSpec** を編集・検証・可視化するための OSS(リファレンス実装)。npm workspaces のモノレポ構成で、共有コア(`packages/core`)と Vite + React 19 + TypeScript の SPA(`packages/web`)からなる(将来 `packages/cli` を追加予定)。
+taskaror は、YAML ベースのタスク定義フォーマット **TaskSpec** を編集・検証・可視化するための OSS(リファレンス実装)。npm workspaces のモノレポ構成で、共有コア(`packages/core`)・Vite + React 19 + TypeScript の SPA(`packages/web`)・CLI(`packages/cli`)からなる。
 
 - プロジェクト名は常に小文字の「taskaror」。文頭・見出しでも大文字にしない。「TaskSpec」はそのまま表記する。
 - ドキュメント・コードコメント・UI 文言・エラーメッセージは日本語で書く。
@@ -15,7 +15,7 @@ taskaror は、YAML ベースのタスク定義フォーマット **TaskSpec** �
 
 ```bash
 npm run dev           # Vite dev server (HMR)
-npm run build         # tsc -b && vite build(出力は packages/web/dist)
+npm run build         # tsc -b → web → cli の順にビルド(cli が web の dist を同梱するため順序が前提)
 npm run typecheck     # tsc -b(型チェックのみ)
 npm run test          # Vitest(1 回実行。全パッケージ一括)
 npm run test:watch    # Vitest(watch モード)
@@ -32,6 +32,8 @@ Docker は colima 経由で動く環境。docker コマンドが失敗したら 
 ```bash
 docker compose up dev                      # 開発用 (port 5173)
 docker compose --profile prod up web --build  # 本番ビルド確認: nginx で dist 配信 (port 8080)
+docker build --target cli -t taskaror .      # CLI イメージ(taskaror が entrypoint)
+docker run --rm -p 5173:5173 taskaror serve  # CLI イメージで GUI を配信
 ```
 
 ## 開発の進め方
@@ -48,8 +50,9 @@ docker compose --profile prod up web --build  # 本番ビルド確認: nginx で
 
 ### モノレポ構成(npm workspaces)
 
-- `packages/core`(`@taskaror/core`) — ブラウザ / React 非依存の共有コアロジック(`src/lib/`)と型定義(`src/types/`)。tsc ビルドせず TypeScript ソースをそのまま `exports` で公開する内部パッケージ(web は Vite が、将来の CLI はバンドラがソースを直接処理する)。`@taskaror/core/<module>` が `src/lib/<module>.ts`、`@taskaror/core/types/taskspec` が型定義に対応する
+- `packages/core`(`@taskaror/core`) — ブラウザ / React 非依存の共有コアロジック(`src/lib/`)と型定義(`src/types/`)。tsc ビルドせず TypeScript ソースをそのまま `exports` で公開する内部パッケージ(web は Vite が、cli は esbuild がソースを直接処理する)。`@taskaror/core/<module>` が `src/lib/<module>.ts`、`@taskaror/core/types/taskspec` が型定義に対応する
 - `packages/web`(`@taskaror/web`) — Vite + React 19 + TypeScript の SPA(GUI エディタ)
+- `packages/cli`(`taskaror`) — CLI。esbuild で単一 CJS(`dist/taskaror.cjs`)にバンドルし、ビルド済み web(`dist/web`)を同梱して配布する(ランタイム依存ゼロ)。サブコマンドは `src/cli.ts` のレジストリに「名前 → { 説明, 実行関数 }」で追記する。npx(`bin`)と Docker(`--target cli`、entrypoint)の両方から実行できる
 - `schema/`・`examples/`・`docs/` はルート直下に置く。特に `schema/` は `$id` の URL パスとディレクトリ構造を一致させているため移動しない
 
 ### TaskSpec とフォーマット同期

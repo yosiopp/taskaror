@@ -14,7 +14,10 @@ services:
   # 本番ビルド確認用: nginx で dist を配信
   # docker compose --profile prod up web --build
   web:
-    build: .
+    build:
+      context: .
+      # Dockerfile の最終ステージは cli のため、nginx 配信の serve ステージを明示する
+      target: serve
     ports:
       - '8080:80'
     profiles:

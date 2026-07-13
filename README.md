@@ -96,12 +96,30 @@ npm install
 # 開発サーバーを起動(Vite / HMR、http://localhost:5173)
 npm run dev
 
-# 本番ビルド(tsc -b && vite build。出力は packages/web/dist/)
+# 本番ビルド(tsc -b → web → cli の順。packages/web/dist/ と packages/cli/dist/ に出力)
 npm run build
 
 # ビルド成果物のプレビュー
 npm run preview
 ```
+
+### CLI(taskaror コマンド)
+
+CLI は `taskaror` を単一エントリとし、npx または Docker から実行できます。現在のサブコマンドは `serve` のみで、`validate` / `lint` / `svg` は今後追加予定です。
+
+```bash
+# npx 経由(要 Node.js)
+npx taskaror --help               # 使い方を表示
+npx taskaror serve                # GUI エディタを配信(http://127.0.0.1:5173)
+npx taskaror serve --port 8080    # ポートを変更(--host で bind 先も変更可)
+
+# Docker 経由(taskaror が entrypoint のイメージ)
+docker build --target cli -t taskaror .
+docker run --rm taskaror --help
+docker run --rm -p 5173:5173 taskaror serve
+```
+
+`serve` が配信する web は静的 SPA のままです。編集内容は従来どおり localStorage とダウンロード/アップロードで扱うため、ファイルのマウントは不要です。リポジトリ内では、ルートで `npm run build` した後に `npm exec taskaror -- serve` でも実行できます。
 
 ### テスト・静的解析
 
@@ -136,9 +154,10 @@ npm workspaces のモノレポ構成です。
 
 - `packages/core`（`@taskaror/core`） — コアロジック（検証・スケジュール導出・ガントのレイアウト計算）と型定義。ブラウザ / React 非依存の純粋な TypeScript で、ビルドせずソースをそのまま公開する内部パッケージです
 - `packages/web`（`@taskaror/web`） — Vite + React 19 + TypeScript の SPA（GUI エディタ）
+- `packages/cli`（`taskaror`） — CLI。esbuild で単一の CJS（`dist/taskaror.cjs`）にバンドルし、ビルド済みの web（`dist/web`）を同梱して配布します（ランタイム依存なし）
 - `schema/`・`examples/`・`docs/` はリポジトリルートに置きます（`schema/` は `$id` の URL パスとディレクトリ構造を一致させるため）
 
-CLI は `packages/cli` として同一リポジトリに追加予定で、共有コア（`@taskaror/core`）を web / CLI 双方から参照します。実行は `taskaror` を単一エントリとし、npx（`npx taskaror <command>`）または Docker（`docker run … taskaror <command>`）から行えるようにします（ネイティブバイナリ化はしません）。web の GUI も `taskaror serve` で起動する静的 SPA として提供し（従来どおり localStorage + ダウンロード/アップロードで、ファイルの直接編集はしません）、`validate` / `lint` / `svg` などのサブコマンドは spec ファイルを引数に取ります。
+CLI は `taskaror` を単一エントリとし、npx（`npx taskaror <command>`）または Docker（`docker run … taskaror <command>`）から実行します（ネイティブバイナリ化はしません）。web の GUI は `taskaror serve` で配信する静的 SPA として提供し（従来どおり localStorage + ダウンロード/アップロードで、ファイルの直接編集はしません）、spec ファイルを引数に取る `validate` / `lint` / `svg` などのサブコマンドは今後追加予定です。ルートの `npm run build` は型チェック → web → cli の順に実行し、cli のビルドで web の `dist` を `packages/cli/dist/web` へコピーします（この順序が前提です）。
 
 ## 提供予定のツール群
 
