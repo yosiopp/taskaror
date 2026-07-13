@@ -267,6 +267,64 @@ export function moveTaskTo(
 }
 
 /**
+ * 依存(succ.depends に pred を足す = succ が pred に依存する)を追加してよいか。
+ * ガントのバー端ハンドルから対象バーへドラッグして depends を張る操作の妥当性判定に使う。
+ * 次のいずれかに当たるときは不可(false):
+ * - pred === succ(自己)/ すでに依存済み(足すものがない)
+ * - pred が succ の子孫、または succ の祖先(木構造上の循環)
+ * - pred が depends グラフ上ですでに succ へ到達できる(依存の循環になる)
+ */
+export function canAddDependency(
+  tasks: Task[],
+  predId: string,
+  succId: string,
+): boolean {
+  if (predId === succId) return false
+  const succ = findTask(tasks, succId)
+  const pred = findTask(tasks, predId)
+  if (succ === undefined || pred === undefined) return false
+  if (succ.depends?.includes(predId)) return false
+  // pred が succ 自身か子孫 / succ が pred の子孫(= pred は succ の祖先)なら不可
+  if (collectIds([succ]).has(predId)) return false
+  if (collectIds([pred]).has(succId)) return false
+  // depends グラフ上で pred から succ に到達できるなら、succ→pred を張ると循環する
+  if (dependsReaches(indexById(tasks), predId, succId)) return false
+  return true
+}
+
+/** 全階層のタスクを id 索引にする */
+function indexById(tasks: Task[]): Map<string, Task> {
+  const map = new Map<string, Task>()
+  const walk = (list: Task[]): void => {
+    for (const task of list) {
+      map.set(task.id, task)
+      if (task.tasks) walk(task.tasks)
+    }
+  }
+  walk(tasks)
+  return map
+}
+
+/** depends 辺(task.depends: 先行 id 群)をたどって fromId から targetId に到達できるか */
+function dependsReaches(
+  taskById: Map<string, Task>,
+  fromId: string,
+  targetId: string,
+): boolean {
+  const seen = new Set<string>()
+  const stack = [fromId]
+  while (stack.length > 0) {
+    const id = stack.pop()!
+    if (id === targetId) return true
+    if (seen.has(id)) continue
+    seen.add(id)
+    const task = taskById.get(id)
+    if (task?.depends) stack.push(...task.depends)
+  }
+  return false
+}
+
+/**
  * 平坦化済みタスク列(深さ付き)から、指定 id の祖先(親〜ルート)の id 集合を返す。
  * 子が親・先祖に依存する論理的循環を防ぐため、依存エディタの選択肢除外に使う。
  */

@@ -35,7 +35,26 @@ export interface GanttChartProps {
   onSelectBar: (id: string) => void
   /** バードラッグ・キーボードでの start / estimate 変更を反映する */
   onUpdateTask: (id: string, changes: Partial<TaskFields>) => void
+  /** 依存線ドラッグ確定: predId(先行)→ succId(後続。succ.depends に pred を足す) */
+  onLinkDependency: (predId: string, succId: string) => void
+  /** 依存線ドラッグ中の可否判定(ドロップ先ハイライトの色分けに使う) */
+  canLinkDependency: (predId: string, succId: string) => boolean
 }
+
+/** 依存線ドラッグ中のプレビュー(始点=接続ハンドル、終点=現在のポインタ) */
+interface LinkPreview {
+  fromX: number
+  fromY: number
+  toX: number
+  toY: number
+  /** ドロップ先のタスク id(チャート外なら null) */
+  targetId: string | null
+  /** この向きで依存を張れるか(canLinkDependency の結果) */
+  valid: boolean
+}
+
+/** 接続ハンドルをバー右端からどれだけ外側に出すか(px) */
+const LINK_HANDLE_OFFSET = 7
 
 const DAY_BAND_HEIGHT = HEADER_HEIGHT - MONTH_BAND_HEIGHT
 
@@ -48,11 +67,99 @@ function GanttChart(props: GanttChartProps) {
     showCritical,
     onSelectBar,
     onUpdateTask,
+    onLinkDependency,
+    canLinkDependency,
   } = props
   const { width, height, dayWidth } = layout
   // クリティカル判定は表示 ON のときだけ有効にする
   const isCritical = (id: string): boolean =>
     showCritical && criticalIds.has(id)
+
+  // --- 依存線ドラッグ(バー端ハンドル → 対象バー) ---
+  // 座標変換のため本文 SVG の参照を持つ。ドラッグ中の始点は ref、描画用は state。
+  const bodyRef = useRef<SVGSVGElement>(null)
+  const linkFromRef = useRef<string | null>(null)
+  const [linking, setLinking] = useState(false)
+  const [linkPreview, setLinkPreview] = useState<LinkPreview | null>(null)
+
+  const rowById = new Map(layout.rows.map((row) => [row.id, row]))
+
+  // 接続ハンドル(バー右端の少し外側)の座標
+  const handlePos = (row: GanttRowLayout): { x: number; y: number } => {
+    const rightEdge =
+      row.kind === 'milestone' ? row.cx + row.barHeight / 2 : row.x + row.width
+    return { x: rightEdge + LINK_HANDLE_OFFSET, y: row.cy }
+  }
+
+  const startLink = (fromId: string): void => {
+    const row = rowById.get(fromId)
+    if (row === undefined) return
+    const pos = handlePos(row)
+    linkFromRef.current = fromId
+    setLinkPreview({
+      fromX: pos.x,
+      fromY: pos.y,
+      toX: pos.x,
+      toY: pos.y,
+      targetId: null,
+      valid: false,
+    })
+    setLinking(true)
+    setLinkingBodyClass(true)
+  }
+
+  // ドラッグ中だけ window でポインタ移動・離しと Esc を受ける。
+  // 始点は ref、判定に使う layout / コールバックは依存に入れて陳腐化を防ぐ。
+  useEffect(() => {
+    if (!linking) return
+    const cancel = (): void => {
+      linkFromRef.current = null
+      setLinkPreview(null)
+      setLinking(false)
+      setLinkingBodyClass(false)
+    }
+    const handleMove = (event: globalThis.PointerEvent): void => {
+      const svg = bodyRef.current
+      const fromId = linkFromRef.current
+      if (svg === null || fromId === null) return
+      const rect = svg.getBoundingClientRect()
+      const toX = event.clientX - rect.left
+      const toY = event.clientY - rect.top
+      const inChart =
+        toX >= 0 && toX <= layout.width && toY >= 0 && toY <= layout.height
+      const target = inChart
+        ? layout.rows[Math.floor(toY / layout.rowHeight)]
+        : undefined
+      const targetId = target && target.id !== fromId ? target.id : null
+      const valid = targetId !== null && canLinkDependency(fromId, targetId)
+      setLinkPreview((prev) =>
+        prev ? { ...prev, toX, toY, targetId, valid } : prev,
+      )
+    }
+    const handleUp = (): void => {
+      const fromId = linkFromRef.current
+      setLinkPreview((prev) => {
+        if (prev && fromId !== null && prev.targetId !== null && prev.valid) {
+          onLinkDependency(fromId, prev.targetId)
+        }
+        return null
+      })
+      linkFromRef.current = null
+      setLinking(false)
+      setLinkingBodyClass(false)
+    }
+    const handleKey = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === 'Escape') cancel()
+    }
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('keydown', handleKey)
+    return () => {
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('keydown', handleKey)
+    }
+  }, [linking, layout, canLinkDependency, onLinkDependency])
 
   if (layout.days.length === 0) {
     return (
@@ -137,6 +244,7 @@ function GanttChart(props: GanttChartProps) {
         </div>
 
         <svg
+          ref={bodyRef}
           className="gantt-body"
           width={width}
           height={height}
@@ -231,8 +339,18 @@ function GanttChart(props: GanttChartProps) {
               dayWidth={dayWidth}
               onSelect={onSelectBar}
               onUpdateTask={onUpdateTask}
+              onStartLink={startLink}
             />
           ))}
+
+          {/* 依存線ドラッグのプレビュー(最前面) */}
+          {linkPreview !== null ? (
+            <LinkDragLayer
+              preview={linkPreview}
+              rowById={rowById}
+              layout={layout}
+            />
+          ) : null}
         </svg>
       </div>
     </div>
@@ -248,6 +366,8 @@ interface BarProps {
   dayWidth: number
   onSelect: (id: string) => void
   onUpdateTask: (id: string, changes: Partial<TaskFields>) => void
+  /** 接続ハンドルの押下で依存線ドラッグを開始する(このバーを先行タスクにする) */
+  onStartLink: (fromId: string) => void
 }
 
 /** ドラッグの種別。move = バー本体(start 変更)、resize = 右端(estimate 変更) */
@@ -270,6 +390,7 @@ function Bar({
   dayWidth,
   onSelect,
   onUpdateTask,
+  onStartLink,
 }: BarProps) {
   // ドラッグ中のプレビュー(確定は pointerup)。null なら非ドラッグ
   const [drag, setDrag] = useState<{
@@ -391,6 +512,26 @@ function Bar({
       }
     : {}
 
+  // 依存線ドラッグの接続ハンドル(バー右端の少し外側)。ホバー/フォーカス時だけ触れる
+  const linkHandleX =
+    (row.kind === 'milestone'
+      ? row.cx + row.barHeight / 2
+      : row.x + row.width) + LINK_HANDLE_OFFSET
+  const linkHandle = (
+    <circle
+      className="gantt-link-handle"
+      cx={linkHandleX}
+      cy={row.cy}
+      r={4}
+      aria-hidden="true"
+      onPointerDown={(event) => {
+        event.stopPropagation()
+        event.preventDefault()
+        onStartLink(row.id)
+      }}
+    />
+  )
+
   if (row.kind === 'milestone') {
     const half = row.barHeight / 2
     const points = [
@@ -400,17 +541,20 @@ function Bar({
       `${cx - half},${row.cy}`,
     ].join(' ')
     return (
-      <polygon
-        className={`gantt-milestone${stateClass}`}
-        points={points}
-        role="button"
-        tabIndex={0}
-        aria-label={ariaLabel}
-        data-gantt-bar={row.id}
-        onKeyDown={handleKeyDown}
-        onPointerDown={(event) => beginDrag('move', event)}
-        {...pointerHandlers}
-      />
+      <g className="gantt-bar-group">
+        <polygon
+          className={`gantt-milestone${stateClass}`}
+          points={points}
+          role="button"
+          tabIndex={0}
+          aria-label={ariaLabel}
+          data-gantt-bar={row.id}
+          onKeyDown={handleKeyDown}
+          onPointerDown={(event) => beginDrag('move', event)}
+          {...pointerHandlers}
+        />
+        {linkHandle}
+      </g>
     )
   }
 
@@ -418,24 +562,27 @@ function Bar({
     const summaryHeight = Math.max(6, Math.round(row.barHeight * 0.45))
     const summaryY = row.cy - summaryHeight / 2
     return (
-      <rect
-        className={`gantt-summary${stateClass}`}
-        x={row.x}
-        y={summaryY}
-        width={row.width}
-        height={summaryHeight}
-        rx={2}
-        role="button"
-        tabIndex={0}
-        aria-label={ariaLabel}
-        data-gantt-bar={row.id}
-        onClick={() => onSelect(row.id)}
-        onKeyDown={handleKeyDown}
-      />
+      <g className="gantt-bar-group">
+        <rect
+          className={`gantt-summary${stateClass}`}
+          x={row.x}
+          y={summaryY}
+          width={row.width}
+          height={summaryHeight}
+          rx={2}
+          role="button"
+          tabIndex={0}
+          aria-label={ariaLabel}
+          data-gantt-bar={row.id}
+          onClick={() => onSelect(row.id)}
+          onKeyDown={handleKeyDown}
+        />
+        {linkHandle}
+      </g>
     )
   }
 
-  // task: 本体(移動)+ 進捗オーバーレイ + 右端ハンドル(リサイズ)
+  // task: 本体(移動)+ 進捗オーバーレイ + 右端ハンドル(リサイズ)+ 接続ハンドル
   return (
     <g className="gantt-bar-group">
       <rect
@@ -473,6 +620,40 @@ function Bar({
         onPointerDown={(event) => beginDrag('resize', event)}
         {...pointerHandlers}
       />
+      {linkHandle}
+    </g>
+  )
+}
+
+interface LinkDragLayerProps {
+  preview: LinkPreview
+  rowById: Map<string, GanttRowLayout>
+  layout: GanttLayout
+}
+
+/** 依存線ドラッグ中の点線と、ドロップ先行のハイライトを最前面に描く */
+function LinkDragLayer({ preview, rowById, layout }: LinkDragLayerProps) {
+  const targetRow =
+    preview.targetId !== null ? rowById.get(preview.targetId) : undefined
+  return (
+    <g className="gantt-link-layer" aria-hidden="true">
+      {targetRow !== undefined ? (
+        <rect
+          className={`gantt-link-target${preview.valid ? ' valid' : ' invalid'}`}
+          x={0}
+          y={targetRow.y}
+          width={layout.width}
+          height={layout.rowHeight}
+        />
+      ) : null}
+      <line
+        className={`gantt-link-line${preview.valid ? ' valid' : ''}`}
+        x1={preview.fromX}
+        y1={preview.fromY}
+        x2={preview.toX}
+        y2={preview.toY}
+        markerEnd="url(#gantt-arrowhead)"
+      />
     </g>
   )
 }
@@ -490,6 +671,12 @@ function setDragBodyClass(mode: DragMode | null): void {
   const { classList } = document.body
   classList.toggle('is-gantt-moving', mode === 'move')
   classList.toggle('is-gantt-resizing', mode === 'resize')
+}
+
+/** 依存線ドラッグ中のカーソル(十字)をページ全体で統一する body クラス */
+function setLinkingBodyClass(on: boolean): void {
+  if (typeof document === 'undefined') return
+  document.body.classList.toggle('is-gantt-linking', on)
 }
 
 /** 進行中ドラッグのポインタキャプチャを解放する(すでに解放済みでも例外にしない) */

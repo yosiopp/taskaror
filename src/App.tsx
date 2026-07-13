@@ -31,7 +31,7 @@ import {
   maxGridWidth,
   parseStoredGridWidth,
 } from './components/paneWidth'
-import { editorReducer, newTask } from './lib/editor'
+import { canAddDependency, editorReducer, newTask } from './lib/editor'
 import type {
   AddMode,
   DropPosition,
@@ -637,6 +637,19 @@ function App() {
     setDialogTaskId(id)
   }
 
+  // 依存線ドラッグの可否判定(先行 pred → 後続 succ。succ.depends に pred を足す)
+  const canLinkDependency = (predId: string, succId: string): boolean =>
+    canAddDependency(spec.tasks, predId, succId)
+
+  /** 依存線ドラッグの確定。succ.depends に pred を足す(妥当な場合のみ) */
+  const handleLinkDependency = (predId: string, succId: string): void => {
+    if (!canAddDependency(spec.tasks, predId, succId)) return
+    const succ = allTasks.find((flat) => flat.task.id === succId)?.task
+    const depends = [...(succ?.depends ?? []), predId]
+    dispatch({ type: 'updateTask', id: succId, changes: { depends } })
+    setSelectedId(succId)
+  }
+
   // --- ファイル入出力 ---
 
   const handleNew = (): void => {
@@ -853,6 +866,8 @@ function App() {
               showCritical={showCriticalPath}
               onSelectBar={setSelectedId}
               onUpdateTask={handleUpdate}
+              onLinkDependency={handleLinkDependency}
+              canLinkDependency={canLinkDependency}
             />
           </div>
           <PaneSeparator

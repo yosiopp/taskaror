@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Task, TaskSpec } from '../types/taskspec'
 import {
+  canAddDependency,
   collectAncestors,
   collectIds,
   editorReducer,
@@ -58,6 +59,55 @@ describe('newTask', () => {
     const task = newTask(s)
     expect(task.title).toBe('新しいタスク')
     expect(collectIds(s.tasks).has(task.id)).toBe(false)
+  })
+})
+
+describe('canAddDependency', () => {
+  // a, b(b1,b2), c(depends a)
+  const tasks = (): Task[] => [
+    { id: 'a', title: 'A' },
+    {
+      id: 'b',
+      title: 'B',
+      tasks: [
+        { id: 'b1', title: 'B1' },
+        { id: 'b2', title: 'B2' },
+      ],
+    },
+    { id: 'c', title: 'C', depends: ['a'] },
+  ]
+
+  it('無関係な 2 タスク間は依存を張れる', () => {
+    expect(canAddDependency(tasks(), 'a', 'b')).toBe(true)
+    expect(canAddDependency(tasks(), 'b1', 'b2')).toBe(true)
+  })
+
+  it('自己参照は不可', () => {
+    expect(canAddDependency(tasks(), 'b', 'b')).toBe(false)
+  })
+
+  it('すでに依存済みなら不可', () => {
+    expect(canAddDependency(tasks(), 'a', 'c')).toBe(false)
+  })
+
+  it('祖先・子孫への依存は不可', () => {
+    expect(canAddDependency(tasks(), 'b', 'b1')).toBe(false) // 親→子
+    expect(canAddDependency(tasks(), 'b1', 'b')).toBe(false) // 子→親
+  })
+
+  it('存在しない id は不可', () => {
+    expect(canAddDependency(tasks(), 'zzz', 'a')).toBe(false)
+  })
+
+  it('depends グラフの循環になる向きは不可', () => {
+    // x ← y ← z(z depends y, y depends x)。x が z に依存すると循環
+    const chain: Task[] = [
+      { id: 'x', title: 'X' },
+      { id: 'y', title: 'Y', depends: ['x'] },
+      { id: 'z', title: 'Z', depends: ['y'] },
+    ]
+    expect(canAddDependency(chain, 'z', 'x')).toBe(false) // x depends z → 循環
+    expect(canAddDependency(chain, 'x', 'z')).toBe(true) // z depends x → 循環しない
   })
 })
 

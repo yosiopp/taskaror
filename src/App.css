@@ -656,10 +656,6 @@ body.is-resizing-cols {
   stroke-dasharray: 3 2;
 }
 
-.gantt-bar-group {
-  cursor: grab;
-}
-
 .gantt-bar {
   fill: var(--bar-task);
   cursor: grab;
@@ -746,6 +742,54 @@ body.is-gantt-resizing * {
 
 .gantt-arrowhead-critical {
   fill: var(--critical);
+}
+
+/* --- 依存線ドラッグ(バー端の接続ハンドル → 対象バー) --- */
+/* 接続ハンドルはバー右端の少し外側。既定は不可視で、バーのホバー/フォーカス時だけ触れる */
+.gantt-link-handle {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  cursor: crosshair;
+}
+
+.gantt-bar-group:hover .gantt-link-handle,
+.gantt-bar-group:focus-within .gantt-link-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ドラッグ中の点線(始点=ハンドル、終点=ポインタ)。有効な向きならアクセント色 */
+.gantt-link-line {
+  stroke: var(--arrow);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  fill: none;
+  pointer-events: none;
+}
+
+.gantt-link-line.valid {
+  stroke: var(--accent);
+}
+
+/* ドロップ先行のハイライト(有効=青系、無効=赤系) */
+.gantt-link-target {
+  pointer-events: none;
+}
+
+.gantt-link-target.valid {
+  fill: rgba(37, 99, 235, 0.14);
+}
+
+.gantt-link-target.invalid {
+  fill: rgba(209, 36, 47, 0.1);
+}
+
+/* 依存線ドラッグ中はページ全体のカーソルを十字にする */
+body.is-gantt-linking * {
+  cursor: crosshair !important;
 }
 
 /* --- タスク編集ダイアログ(ダブルクリックで開く) --- */
