@@ -227,14 +227,7 @@ function MenuBar({ menus }: MenuBarProps) {
                         itemRefs.current[itemIndex] = el
                       }}
                       onClick={() => activate(index, item)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault()
-                          activate(index, item)
-                        } else {
-                          onItemKeyDown(event, index)
-                        }
-                      }}
+                      onKeyDown={(event) => onItemKeyDown(event, index)}
                     >
                       <span className="menubar-check" aria-hidden="true">
                         {checked ? '✓' : ''}

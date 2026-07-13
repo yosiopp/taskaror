@@ -53,8 +53,14 @@ interface LinkPreview {
   valid: boolean
 }
 
-/** 接続ハンドルをバー右端からどれだけ外側に出すか(px) */
-const LINK_HANDLE_OFFSET = 7
+/**
+ * 接続ハンドル(半径 LINK_HANDLE_RADIUS の円)の中心をバー右端からどれだけ
+ * 外側に出すか(px)。ハンドルは非ホバー時 pointer-events:none のため、バーとの間に
+ * 隙間があるとホバーの連鎖が切れて掴めなくなる。半径未満のオフセットにして
+ * ハンドル左端をバー右端に重ねる(隙間ゼロ)ことで、バーからそのまま掴める。
+ */
+const LINK_HANDLE_RADIUS = 4
+const LINK_HANDLE_OFFSET = 3
 
 const DAY_BAND_HEIGHT = HEADER_HEIGHT - MONTH_BAND_HEIGHT
 
@@ -82,9 +88,22 @@ function GanttChart(props: GanttChartProps) {
   const [linking, setLinking] = useState(false)
   const [linkPreview, setLinkPreview] = useState<LinkPreview | null>(null)
 
+  // window リスナは linking の間だけ張る(下の effect)。その中で参照する
+  // layout / 判定コールバックは毎レンダーで identity が変わるため、ref 経由で
+  // 最新値を読み、effect の依存は linking だけにして再購読を避ける。
+  // ref の更新はレンダー中ではなく effect で行う(react-hooks/refs 準拠)。
+  const layoutRef = useRef(layout)
+  const canLinkRef = useRef(canLinkDependency)
+  const onLinkRef = useRef(onLinkDependency)
+  useEffect(() => {
+    layoutRef.current = layout
+    canLinkRef.current = canLinkDependency
+    onLinkRef.current = onLinkDependency
+  })
+
   const rowById = new Map(layout.rows.map((row) => [row.id, row]))
 
-  // 接続ハンドル(バー右端の少し外側)の座標
+  // 接続ハンドル(バー右端に接する位置)の座標
   const handlePos = (row: GanttRowLayout): { x: number; y: number } => {
     const rightEdge =
       row.kind === 'milestone' ? row.cx + row.barHeight / 2 : row.x + row.width
@@ -108,20 +127,32 @@ function GanttChart(props: GanttChartProps) {
     setLinkingBodyClass(true)
   }
 
-  // ドラッグ中だけ window でポインタ移動・離しと Esc を受ける。
-  // 始点は ref、判定に使う layout / コールバックは依存に入れて陳腐化を防ぐ。
+  // ドラッグ中だけ window でポインタ移動・離しと Esc を受ける。依存は linking のみ。
+  // cleanup で body クラスも必ず落とすので、ドラッグ中にアンマウントしても残らない。
   useEffect(() => {
     if (!linking) return
-    const cancel = (): void => {
+    const finish = (commit: boolean): void => {
+      const fromId = linkFromRef.current
+      setLinkPreview((prev) => {
+        if (
+          commit &&
+          prev &&
+          fromId !== null &&
+          prev.targetId !== null &&
+          prev.valid
+        ) {
+          onLinkRef.current(fromId, prev.targetId)
+        }
+        return null
+      })
       linkFromRef.current = null
-      setLinkPreview(null)
       setLinking(false)
-      setLinkingBodyClass(false)
     }
     const handleMove = (event: globalThis.PointerEvent): void => {
       const svg = bodyRef.current
       const fromId = linkFromRef.current
       if (svg === null || fromId === null) return
+      const layout = layoutRef.current
       const rect = svg.getBoundingClientRect()
       const toX = event.clientX - rect.left
       const toY = event.clientY - rect.top
@@ -131,25 +162,14 @@ function GanttChart(props: GanttChartProps) {
         ? layout.rows[Math.floor(toY / layout.rowHeight)]
         : undefined
       const targetId = target && target.id !== fromId ? target.id : null
-      const valid = targetId !== null && canLinkDependency(fromId, targetId)
+      const valid = targetId !== null && canLinkRef.current(fromId, targetId)
       setLinkPreview((prev) =>
         prev ? { ...prev, toX, toY, targetId, valid } : prev,
       )
     }
-    const handleUp = (): void => {
-      const fromId = linkFromRef.current
-      setLinkPreview((prev) => {
-        if (prev && fromId !== null && prev.targetId !== null && prev.valid) {
-          onLinkDependency(fromId, prev.targetId)
-        }
-        return null
-      })
-      linkFromRef.current = null
-      setLinking(false)
-      setLinkingBodyClass(false)
-    }
+    const handleUp = (): void => finish(true)
     const handleKey = (event: globalThis.KeyboardEvent): void => {
-      if (event.key === 'Escape') cancel()
+      if (event.key === 'Escape') finish(false)
     }
     window.addEventListener('pointermove', handleMove)
     window.addEventListener('pointerup', handleUp)
@@ -158,8 +178,9 @@ function GanttChart(props: GanttChartProps) {
       window.removeEventListener('pointermove', handleMove)
       window.removeEventListener('pointerup', handleUp)
       window.removeEventListener('keydown', handleKey)
+      setLinkingBodyClass(false)
     }
-  }, [linking, layout, canLinkDependency, onLinkDependency])
+  }, [linking])
 
   if (layout.days.length === 0) {
     return (
@@ -522,7 +543,7 @@ function Bar({
       className="gantt-link-handle"
       cx={linkHandleX}
       cy={row.cy}
-      r={4}
+      r={LINK_HANDLE_RADIUS}
       aria-hidden="true"
       onPointerDown={(event) => {
         event.stopPropagation()
