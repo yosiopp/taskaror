@@ -55,7 +55,7 @@ import type { DayWindow, GanttLayout, GanttRow } from './lib/gantt'
 import { renderGanttSvg } from './lib/ganttSvg'
 import { computeCriticalPath } from './lib/critical'
 import { formatDate, today as localToday } from './lib/date'
-import type { TaskSpec } from './types/taskspec'
+import type { Task, TaskSpec } from './types/taskspec'
 
 interface Derived {
   visibleRows: GanttRow[]
@@ -569,6 +569,18 @@ function App() {
     setSelectedId(task.id)
   }
 
+  /**
+   * ルート末尾に空タスクを作成して選択し、作成したタスクを返す。
+   * グリッドの空行クリック(スプレッドシート風の新規作成)から呼ばれ、
+   * 呼び出し側は返り値を使って名称セルの編集をすぐ開始できる。
+   */
+  const handleCreateTask = (): Task => {
+    const task = newTask(spec)
+    dispatch({ type: 'addTask', task, mode: 'root-append' })
+    setSelectedId(task.id)
+    return task
+  }
+
   const handleRemove = (): void => {
     if (!selectedId) return
     // 削除でフォーカス(選択)が消えないよう、削除前の表示行から移動先を決める
@@ -815,6 +827,7 @@ function App() {
               onToggleCollapse={handleToggleCollapse}
               onUpdate={handleUpdate}
               onMove={handleMoveTask}
+              onCreateTask={handleCreateTask}
             />
             <GanttChart
               layout={layout}

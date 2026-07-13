@@ -384,6 +384,42 @@ body.is-resizing-cols {
   background: var(--row-selected);
 }
 
+/* 空行(スプレッドシート風)。クリックで末尾に新規タスクを作る */
+.grid-row-empty {
+  cursor: cell;
+}
+
+.grid-row-empty:hover {
+  background: var(--row-hover);
+}
+
+.grid-row-empty .grid-cell {
+  cursor: cell;
+}
+
+/* 最下端の行追加 UI */
+.grid-add-rows {
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--gantt-rowline);
+}
+
+.grid-add-rows-btn {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.grid-add-rows-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 /* 名前セル先頭のドラッグ用グリップ(掴んで木構造を移動する) */
 .drag-handle {
   flex: 0 0 auto;

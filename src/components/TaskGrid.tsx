@@ -44,7 +44,16 @@ export interface TaskGridProps {
   onUpdate: (id: string, changes: Partial<TaskFields>) => void
   /** ドラッグ&ドロップで id を targetId の前/後/子へ移動する */
   onMove: (id: string, targetId: string, position: DropPosition) => void
+  /** 空行クリックでルート末尾に新規タスクを作成し、作成したタスクを返す */
+  onCreateTask: () => Task
 }
+
+/** 初期表示する空グリッド行の数(スプレッドシート風。行追加 UI で増やせる) */
+const INITIAL_EMPTY_ROWS = 100
+/** 「行を追加」で一度に増やす行数の既定値 */
+const ADD_ROWS_STEP = 100
+/** 空行に描く列セル数(GRID_COLUMNS の列数と一致させ、列罫線を通す) */
+const EMPTY_CELLS = [0, 1, 2, 3, 4, 5]
 
 function TaskGrid(props: TaskGridProps) {
   const {
@@ -56,9 +65,12 @@ function TaskGrid(props: TaskGridProps) {
     onToggleCollapse,
     onUpdate,
     onMove,
+    onCreateTask,
   } = props
 
   const [editing, setEditing] = useState<EditingCell | null>(null)
+  // 表示する空行数(スプレッドシート風。行追加 UI で増やす)
+  const [emptyRows, setEmptyRows] = useState(INITIAL_EMPTY_ROWS)
   const [draft, setDraft] = useState('')
   // キーボード移動でセルを切り替える際、旧 input の blur による二重処理を防ぐ
   const suppressBlurRef = useRef(false)
@@ -76,6 +88,18 @@ function TaskGrid(props: TaskGridProps) {
     onSelect(id)
     setEditing({ id, field })
     setDraft(fieldToString(task, field))
+  }
+
+  /**
+   * 空行クリック(スプレッドシート風の新規作成)。末尾にタスクを作り、
+   * 続けて名称を打てるよう名称セルの編集をすぐ開始する。
+   * onCreateTask は id を同期に採番するので、次のレンダーで新規行が現れると
+   * その名称セルが入力状態で描画される。
+   */
+  const handleEmptyRowClick = (): void => {
+    const task = onCreateTask()
+    setEditing({ id: task.id, field: 'title' })
+    setDraft(task.title)
   }
 
   const commit = (cell: EditingCell, value: string): void => {
@@ -400,6 +424,32 @@ function TaskGrid(props: TaskGridProps) {
             </div>
           )
         })}
+
+        {/* 空行(スプレッドシート風)。クリックで末尾に新規タスクを作る */}
+        {Array.from({ length: emptyRows }, (_, i) => (
+          <div
+            key={`empty-${i}`}
+            className="grid-row grid-row-empty"
+            style={{ height: ROW_HEIGHT, gridTemplateColumns: GRID_COLUMNS }}
+            onClick={handleEmptyRowClick}
+            title="クリックして新しいタスクを追加"
+          >
+            {EMPTY_CELLS.map((c) => (
+              <span key={c} className="grid-cell" aria-hidden="true" />
+            ))}
+          </div>
+        ))}
+
+        {/* 最下端の行追加 UI(スプレッドシート風の「○行 追加」) */}
+        <div className="grid-add-rows">
+          <button
+            type="button"
+            className="grid-add-rows-btn"
+            onClick={() => setEmptyRows((n) => n + ADD_ROWS_STEP)}
+          >
+            ＋ {ADD_ROWS_STEP} 行 追加
+          </button>
+        </div>
       </div>
     </div>
   )
