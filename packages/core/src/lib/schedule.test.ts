@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { TaskSpec } from '../types/taskspec'
-import { scheduleTasks, type ScheduledTask } from './schedule'
+import type { Task, TaskSpec } from '../types/taskspec'
+import {
+  computeStartFloors,
+  scheduleTasks,
+  type ScheduledTask,
+} from './schedule'
 
 // 基準となる曜日(2026-07):
 //  13(月) 14(火) 15(水) 16(木) 17(金) 18(土) 19(日) 20(月) 21(火) 22(水)
@@ -229,6 +233,47 @@ describe('scheduleTasks: 親子(サマリー)', () => {
     )
     expect(get(rows, 'c').start).toBe('2026-07-13')
     expect(get(rows, 'p').start).toBe('2026-07-13')
+  })
+})
+
+describe('computeStartFloors', () => {
+  it('親の start が子の開始下限として伝播する', () => {
+    const child: Task = { id: 'c', title: 'C', estimate: '1d' }
+    const parent: Task = {
+      id: 'p',
+      title: 'P',
+      start: '2026-07-20',
+      tasks: [child],
+    }
+    const floors = computeStartFloors(spec([parent]), { today: TODAY })
+    expect(floors.get(child)).toEqual({
+      inherited: '2026-07-20',
+      depends: undefined,
+    })
+    // ルートタスクの下限はプロジェクト最早 start
+    expect(floors.get(parent)?.inherited).toBe('2026-07-20')
+  })
+
+  it('depends 由来の下限は最も遅い先行の successorStart を返す', () => {
+    const a: Task = { id: 'a', title: 'A', start: '2026-07-13', estimate: '1d' }
+    const b: Task = { id: 'b', title: 'B', start: '2026-07-13', estimate: '3d' }
+    const c: Task = { id: 'c', title: 'C', estimate: '1d', depends: ['a', 'b'] }
+    const floors = computeStartFloors(spec([a, b, c]), { today: TODAY })
+    // b の終了(07-15)の翌営業日
+    expect(floors.get(c)?.depends).toEqual({
+      date: '2026-07-16',
+      predecessorId: 'b',
+    })
+  })
+
+  it('先行が 0d マイルストーンなら depends 由来の下限は同日になる', () => {
+    const m: Task = { id: 'm', title: 'M', start: '2026-07-17' } // 金曜
+    const n: Task = { id: 'n', title: 'N', estimate: '1d', depends: ['m'] }
+    const floors = computeStartFloors(spec([m, n]), { today: TODAY })
+    expect(floors.get(n)?.depends).toEqual({
+      date: '2026-07-17',
+      predecessorId: 'm',
+    })
   })
 })
 

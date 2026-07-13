@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { lintCommand } from './commands/lint'
 import { serveCommand } from './commands/serve'
 import { svgCommand } from './commands/svg'
 import { validateCommand } from './commands/validate'
@@ -14,11 +15,11 @@ export interface Command {
   run: (argv: string[]) => number | Promise<number>
 }
 
-// サブコマンドのレジストリ(名前 → 定義)。
-// 後続のコマンド(lint など)はここに追記する。
+// サブコマンドのレジストリ(名前 → 定義)。後続のコマンドはここに追記する。
 const commands: Record<string, Command> = {
   serve: serveCommand,
   validate: validateCommand,
+  lint: lintCommand,
   svg: svgCommand,
 }
 

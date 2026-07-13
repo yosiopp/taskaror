@@ -46,10 +46,16 @@ export interface ScheduleOptions {
   today?: Date | string
 }
 
-export function scheduleTasks(
-  spec: TaskSpec,
-  options: ScheduleOptions = {},
-): ScheduledTask[] {
+/** タスクの開始下限の内訳(lint などの分析用)。日付はいずれも YYYY-MM-DD */
+export interface TaskStartFloor {
+  /** 祖先(親の start・depends)から伝播する開始下限 */
+  inherited: string
+  /** 自タスクの depends から導かれる開始下限。最も遅い先行とその successorStart */
+  depends?: { date: string; predecessorId: string }
+}
+
+/** スケジュール解決の内部機構。scheduleTasks と computeStartFloors で共有する */
+function createResolver(spec: TaskSpec, options: ScheduleOptions) {
   const todayDate = resolveToday(options.today)
 
   const taskById = new Map<string, Task>()
@@ -128,6 +134,24 @@ export function scheduleTasks(
     return end
   }
 
+  return {
+    taskById,
+    hasChildren,
+    isMilestone,
+    inheritedFloor,
+    successorStart,
+    resolveStart,
+    resolveEnd,
+  }
+}
+
+export function scheduleTasks(
+  spec: TaskSpec,
+  options: ScheduleOptions = {},
+): ScheduledTask[] {
+  const resolver = createResolver(spec, options)
+  const { hasChildren, isMilestone, resolveStart, resolveEnd } = resolver
+
   const build = (task: Task): ScheduledTask => {
     const start = resolveStart(task)
     const end = resolveEnd(task)
@@ -144,6 +168,48 @@ export function scheduleTasks(
   }
 
   return spec.tasks.map(build)
+}
+
+/**
+ * 各タスクの開始下限(祖先由来・depends 由来)を計算する。
+ * scheduleTasks と同じ伝播ロジック(createResolver)を共有しており、
+ * lint が明示 start との矛盾検出(docs/lint.md)に使う。キーはタスクオブジェクト。
+ */
+export function computeStartFloors(
+  spec: TaskSpec,
+  options: ScheduleOptions = {},
+): Map<Task, TaskStartFloor> {
+  const resolver = createResolver(spec, options)
+  const floors = new Map<Task, TaskStartFloor>()
+  const walk = (tasks: Task[]): void => {
+    for (const task of tasks) {
+      floors.set(task, {
+        inherited: formatDate(resolver.inheritedFloor(task)),
+        depends: dependsFloor(task, resolver),
+      })
+      if (task.tasks) walk(task.tasks)
+    }
+  }
+  walk(spec.tasks)
+  return floors
+}
+
+/** 自タスクの depends から導かれる開始下限(最も遅い先行の successorStart) */
+function dependsFloor(
+  task: Task,
+  resolver: ReturnType<typeof createResolver>,
+): TaskStartFloor['depends'] {
+  let latest: { date: Date; predecessorId: string } | undefined
+  for (const depId of task.depends ?? []) {
+    const pred = resolver.taskById.get(depId)
+    if (pred === undefined) continue // 参照切れは validateStructure 側で報告する
+    const date = resolver.successorStart(pred)
+    if (latest === undefined || date.getTime() > latest.date.getTime()) {
+      latest = { date, predecessorId: depId }
+    }
+  }
+  if (latest === undefined) return undefined
+  return { date: formatDate(latest.date), predecessorId: latest.predecessorId }
 }
 
 function resolveToday(value: ScheduleOptions['today']): Date {

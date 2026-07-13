@@ -39,7 +39,7 @@ TypeScript として書かれている(CLI の SVG ガント出力 `taskaror svg
 - 子を持つタスクの期間は子の**包絡**(最早開始〜最遅終了)。親自身の `estimate` は
   スケジュール導出には使わない。
 - 親の `start`・`depends` は子孫全体の**開始下限**として伝播する。個々の子の明示 start は
-  それより優先する(矛盾の検出は将来の linter で扱う)。
+  それより優先する(この矛盾の検出は `taskaror lint` が扱う。[lint.md](lint.md) 参照)。
 
 ## 異常系
 

@@ -105,7 +105,7 @@ npm run preview
 
 ### CLI(taskaror コマンド)
 
-CLI は `taskaror` を単一エントリとし、npx または Docker から実行できます。現在のサブコマンドは `serve` / `validate` / `svg` で、`lint` は今後追加予定です。
+CLI は `taskaror` を単一エントリとし、npx または Docker から実行できます。現在のサブコマンドは `serve` / `validate` / `lint` / `svg` です。
 
 ```bash
 # npx 経由(要 Node.js)
@@ -113,6 +113,7 @@ npx taskaror --help               # 使い方を表示
 npx taskaror serve                # GUI エディタを配信(http://127.0.0.1:5173)
 npx taskaror serve --port 8080    # ポートを変更(--host で bind 先も変更可)
 npx taskaror validate task.taskspec.yaml    # spec を検証(複数ファイル可)
+npx taskaror lint task.taskspec.yaml        # スケジュール導出から見た矛盾・怪しい記述を検出(ルールは docs/lint.md)
 npx taskaror svg task.taskspec.yaml                 # ガントチャート SVG を標準出力へ
 npx taskaror svg task.taskspec.yaml -o gantt.svg    # ファイルへ書き出し(--output でも可)
 
@@ -122,6 +123,7 @@ docker run --rm taskaror --help
 docker run --rm -p 5173:5173 taskaror serve
 # ファイルを引数に取るコマンドは、カレントディレクトリを /work にマウントして渡す
 docker run --rm -v $PWD:/work taskaror validate task.taskspec.yaml
+docker run --rm -v $PWD:/work taskaror lint task.taskspec.yaml
 docker run --rm -v $PWD:/work taskaror svg task.taskspec.yaml -o gantt.svg
 ```
 
@@ -163,7 +165,7 @@ npm workspaces のモノレポ構成です。
 - `packages/cli`（`taskaror`） — CLI。esbuild で単一の CJS（`dist/taskaror.cjs`）にバンドルし、ビルド済みの web（`dist/web`）を同梱して配布します（ランタイム依存なし）
 - `schema/`・`examples/`・`docs/` はリポジトリルートに置きます（`schema/` は `$id` の URL パスとディレクトリ構造を一致させるため）
 
-CLI は `taskaror` を単一エントリとし、npx（`npx taskaror <command>`）または Docker（`docker run … taskaror <command>`）から実行します（ネイティブバイナリ化はしません）。web の GUI は `taskaror serve` で配信する静的 SPA として提供し（従来どおり localStorage + ダウンロード/アップロードで、ファイルの直接編集はしません）、spec ファイルを引数に取るサブコマンドとして `validate` / `svg` を提供します（`lint` は今後追加予定）。ルートの `npm run build` は型チェック → web → cli の順に実行し、cli のビルドで web の `dist` を `packages/cli/dist/web` へコピーします（この順序が前提です）。
+CLI は `taskaror` を単一エントリとし、npx（`npx taskaror <command>`）または Docker（`docker run … taskaror <command>`）から実行します（ネイティブバイナリ化はしません）。web の GUI は `taskaror serve` で配信する静的 SPA として提供し（従来どおり localStorage + ダウンロード/アップロードで、ファイルの直接編集はしません）、spec ファイルを引数に取るサブコマンドとして `validate` / `lint` / `svg` を提供します（`lint` のルールは [docs/lint.md](docs/lint.md) を参照）。ルートの `npm run build` は型チェック → web → cli の順に実行し、cli のビルドで web の `dist` を `packages/cli/dist/web` へコピーします（この順序が前提です）。
 
 ## 提供予定のツール群
 
