@@ -14,6 +14,8 @@ export type MenuItem =
       label: string
       onSelect: () => void
       disabled?: boolean
+      /** ショートカットキーの表示(例: 'Ctrl+Z')。動作は各画面側で実装する */
+      shortcut?: string
     }
   | {
       kind: 'checkbox'
@@ -208,6 +210,8 @@ function MenuBar({ menus }: MenuBarProps) {
                   const checked =
                     item.kind !== 'action' ? item.checked : undefined
                   const disabled = item.kind === 'action' && item.disabled
+                  const shortcut =
+                    item.kind === 'action' ? item.shortcut : undefined
                   const role =
                     item.kind === 'checkbox'
                       ? 'menuitemcheckbox'
@@ -233,6 +237,9 @@ function MenuBar({ menus }: MenuBarProps) {
                         {checked ? '✓' : ''}
                       </span>
                       <span className="menubar-label">{item.label}</span>
+                      {shortcut ? (
+                        <span className="menubar-shortcut">{shortcut}</span>
+                      ) : null}
                     </button>
                   )
                 })}

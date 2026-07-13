@@ -45,4 +45,41 @@ describe('App の UI', () => {
       screen.queryByRole('toolbar', { name: 'タスク操作' }),
     ).not.toBeInTheDocument()
   })
+
+  it('[編集]メニューにショートカットキーが表示される', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('menuitem', { name: '編集' }))
+    // 元に戻す / タスク追加 / タスク削除 のショートカット表示
+    expect(screen.getByText('Ctrl+Z')).toBeInTheDocument()
+    expect(screen.getByText('Insert')).toBeInTheDocument()
+    expect(screen.getByText('Delete')).toBeInTheDocument()
+  })
+
+  it('Insert キーでタスクを追加し、Delete キーで削除できる', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    // 初期状態に「新しいタスク」は無い
+    expect(screen.queryByText('新しいタスク')).not.toBeInTheDocument()
+
+    // Insert で追加(未選択ならルート末尾に追加され、その行が選択される)
+    await user.keyboard('{Insert}')
+    expect(screen.getByText('新しいタスク')).toBeInTheDocument()
+
+    // 追加された行が選択中なので Delete で削除できる
+    await user.keyboard('{Delete}')
+    expect(screen.queryByText('新しいタスク')).not.toBeInTheDocument()
+  })
+
+  it('[編集]メニューの「タスク追加」クリックでも追加できる', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('menuitem', { name: '編集' }))
+    await user.click(screen.getByRole('menuitem', { name: /タスク追加/ }))
+
+    expect(screen.getByText('新しいタスク')).toBeInTheDocument()
+  })
 })

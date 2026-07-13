@@ -5,7 +5,14 @@
  * 自動的に再スケジュール・再レイアウト・再描画される(編集のリアルタイム反映)。
  */
 import './App.css'
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import type { DragEvent } from 'react'
 import sampleSource from '../examples/ecommerce.taskspec.yaml?raw'
 import Toolbar from './components/Toolbar'
@@ -600,12 +607,14 @@ function App() {
   }, [scrollMetrics, gridWidth, layout.days.length, layout.dayWidth])
 
   // --- 編集ハンドラ ---
-  const handleAdd = (): void => {
+  // handleAdd / handleRemove はキーボードショートカット(Insert / Delete)の
+  // useEffect 依存に入るため、useCallback で安定化して不要な再購読を避ける。
+  const handleAdd = useCallback((): void => {
     const task = newTask(spec)
     const mode: AddMode = selectedId ? 'sibling-after' : 'root-append'
     dispatch({ type: 'addTask', task, mode, targetId: selectedId ?? undefined })
     setSelectedId(task.id)
-  }
+  }, [spec, selectedId])
 
   /**
    * ルート末尾に空タスクを作成して選択し、作成したタスクを返す。
@@ -619,13 +628,13 @@ function App() {
     return task
   }
 
-  const handleRemove = (): void => {
+  const handleRemove = useCallback((): void => {
     if (!selectedId) return
     // 削除でフォーカス(選択)が消えないよう、削除前の表示行から移動先を決める
     const nextSelected = nextSelectionAfterRemoval(visibleRows, selectedId)
     dispatch({ type: 'removeTask', id: selectedId })
     setSelectedId(nextSelected)
-  }
+  }, [selectedId, visibleRows])
 
   const handleIndent = (): void => {
     if (selectedId) dispatch({ type: 'indentTask', id: selectedId })
@@ -678,6 +687,26 @@ function App() {
     dispatch({ type: 'updateTask', id: succId, changes: { depends } })
     setSelectedId(succId)
   }
+
+  // タスク操作のショートカット(Insert=追加 / Delete=削除)。undo/redo と分けて張る。
+  // 入力欄・ダイアログ表示中・ガント編集ビュー以外では無効にする。handleAdd /
+  // handleRemove は毎レンダー再生成されるため依存に入れ、常に最新の状態で動かす。
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (isEditableTarget(event.target)) return
+      if (dialogTaskId !== null || viewMode !== 'gantt') return
+      if (event.key === 'Insert') {
+        event.preventDefault()
+        handleAdd()
+      } else if (event.key === 'Delete') {
+        if (selectedId === null) return
+        event.preventDefault()
+        handleRemove()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [viewMode, dialogTaskId, selectedId, handleAdd, handleRemove])
 
   // --- ファイル入出力 ---
 

@@ -176,6 +176,14 @@
   flex: 1;
 }
 
+/* ショートカットキーの表示(右寄せ・淡色) */
+.menubar-shortcut {
+  flex: 0 0 auto;
+  margin-left: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
 .menubar-separator {
   height: 1px;
   margin: 0.25rem 0.25rem;
