@@ -15,6 +15,7 @@ import GanttChart from './components/GanttChart'
 import PaneSeparator from './components/PaneSeparator'
 import YamlView from './components/YamlView'
 import WbsTable from './components/WbsTable'
+import TaskDialog from './components/TaskDialog'
 import LoadErrorNotice from './components/LoadError'
 import type { LoadError } from './components/LoadError'
 import {
@@ -343,6 +344,8 @@ function App() {
   const spec = history.present
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // 編集ダイアログの対象タスク id(null なら閉じている)
+  const [dialogTaskId, setDialogTaskId] = useState<string | null>(null)
   // ファイル読み込みの失敗内容(パース or 検証)。成功時・閉じたときは null
   const [loadError, setLoadError] = useState<LoadError | null>(null)
   // 本文のビューモード(ガント編集 / YAML / WBS 表)
@@ -423,6 +426,12 @@ function App() {
 
   // 依存編集の選択肢に使う全タスク(深さ付き)
   const allTasks = useMemo(() => flattenTasks(spec.tasks), [spec])
+
+  // 編集ダイアログの対象タスク(spec 上の実体)。削除等で消えたら null
+  const dialogTask =
+    dialogTaskId !== null
+      ? (allTasks.find((flat) => flat.task.id === dialogTaskId)?.task ?? null)
+      : null
 
   // spec / collapsedIds からスケジュール・ガントレイアウトを派生させる。
   // 不正な estimate 等で scheduleTasks が throw しうるので try/catch で囲む。
@@ -620,6 +629,12 @@ function App() {
 
   const handleUpdate = (id: string, changes: Partial<TaskFields>): void => {
     dispatch({ type: 'updateTask', id, changes })
+  }
+
+  /** ダブルクリックで編集ダイアログを開く(対象を選択もする) */
+  const handleOpenDialog = (id: string): void => {
+    setSelectedId(id)
+    setDialogTaskId(id)
   }
 
   // --- ファイル入出力 ---
@@ -828,6 +843,7 @@ function App() {
               onUpdate={handleUpdate}
               onMove={handleMoveTask}
               onCreateTask={handleCreateTask}
+              onOpenDialog={handleOpenDialog}
             />
             <GanttChart
               layout={layout}
@@ -868,6 +884,18 @@ function App() {
             .taskspec.yaml をドロップして読み込み
           </div>
         </div>
+      ) : null}
+
+      {dialogTask !== null ? (
+        <TaskDialog
+          task={dialogTask}
+          allTasks={allTasks}
+          onClose={() => setDialogTaskId(null)}
+          onSubmit={(changes) => {
+            dispatch({ type: 'updateTask', id: dialogTask.id, changes })
+            setDialogTaskId(null)
+          }}
+        />
       ) : null}
     </div>
   )

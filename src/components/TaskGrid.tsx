@@ -46,6 +46,8 @@ export interface TaskGridProps {
   onMove: (id: string, targetId: string, position: DropPosition) => void
   /** 空行クリックでルート末尾に新規タスクを作成し、作成したタスクを返す */
   onCreateTask: () => Task
+  /** ダブルクリックで編集ダイアログを開く */
+  onOpenDialog: (id: string) => void
 }
 
 /** 初期表示する空グリッド行の数(スプレッドシート風。行追加 UI で増やせる) */
@@ -66,6 +68,7 @@ function TaskGrid(props: TaskGridProps) {
     onUpdate,
     onMove,
     onCreateTask,
+    onOpenDialog,
   } = props
 
   const [editing, setEditing] = useState<EditingCell | null>(null)
@@ -100,6 +103,16 @@ function TaskGrid(props: TaskGridProps) {
     const task = onCreateTask()
     setEditing({ id: task.id, field: 'title' })
     setDraft(task.title)
+  }
+
+  /**
+   * 行のダブルクリックで編集ダイアログを開く。
+   * 1 クリック目でインラインセル編集が始まっていることがあるため、
+   * それを打ち切ってからダイアログを開く(モーダルが前面に出るので競合しない)。
+   */
+  const handleRowDoubleClick = (id: string): void => {
+    setEditing(null)
+    onOpenDialog(id)
   }
 
   const commit = (cell: EditingCell, value: string): void => {
@@ -341,6 +354,7 @@ function TaskGrid(props: TaskGridProps) {
               className={`grid-row${selected ? ' selected' : ''}${dropClass}`}
               style={{ height: ROW_HEIGHT, gridTemplateColumns: GRID_COLUMNS }}
               onClick={() => onSelect(task.id)}
+              onDoubleClick={() => handleRowDoubleClick(task.id)}
               onDragOver={(event) => handleRowDragOver(event, task.id)}
               onDrop={(event) => handleRowDrop(event, task.id)}
             >
