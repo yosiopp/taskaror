@@ -6,9 +6,9 @@
  */
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
-import type { ScheduledTask } from '../lib/schedule'
-import { computeWbs } from '../lib/wbs'
-import type { TaskSpec } from '../types/taskspec'
+import type { ScheduledTask } from '@taskaror/core/schedule'
+import { computeWbs } from '@taskaror/core/wbs'
+import type { TaskSpec } from '@taskaror/core/types/taskspec'
 
 export interface WbsTableProps {
   /** 現在の spec(WBS 番号とタスク情報の元) */

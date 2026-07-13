@@ -12,12 +12,12 @@
 import { useState } from 'react'
 import type { ChangeEvent } from 'react'
 import type { Document } from 'yaml'
-import { serializeTaskSpec } from '../lib/taskspec'
-import { parseTaskSpecDocument } from '../lib/fidelity'
-import { validateTaskSpec } from '../lib/validate'
+import { serializeTaskSpec } from '@taskaror/core/taskspec'
+import { parseTaskSpecDocument } from '@taskaror/core/fidelity'
+import { validateTaskSpec } from '@taskaror/core/validate'
 import LoadErrorNotice from './LoadError'
 import type { LoadError } from './LoadError'
-import type { TaskSpec } from '../types/taskspec'
+import type { TaskSpec } from '@taskaror/core/types/taskspec'
 
 export interface YamlViewProps {
   /** 現在の spec(表示・再生成の元) */

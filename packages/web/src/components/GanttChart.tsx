@@ -7,14 +7,18 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
-import type { DayWindow, GanttLayout, GanttRowLayout } from '../lib/gantt'
+import type {
+  DayWindow,
+  GanttLayout,
+  GanttRowLayout,
+} from '@taskaror/core/gantt'
 import {
   estimateFromRange,
   pxToDayDelta,
   shiftDateByBusinessDays,
   shiftDateByDays,
-} from '../lib/gantt'
-import type { TaskFields } from '../lib/editor'
+} from '@taskaror/core/gantt'
+import type { TaskFields } from '@taskaror/core/editor'
 import { HEADER_HEIGHT, MONTH_BAND_HEIGHT } from './constants'
 
 /** 選択中の依存線(先行→後続の 1 本)。相互排他のため App で一元管理する */

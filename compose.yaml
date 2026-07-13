@@ -4,7 +4,7 @@ services:
   dev:
     image: node:24-alpine
     working_dir: /app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    command: sh -c "npm install && npm run dev -w @taskaror/web -- --host 0.0.0.0"
     ports:
       - '5173:5173'
     volumes:

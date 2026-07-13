@@ -4,18 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-taskaror は、YAML ベースのタスク定義フォーマット **TaskSpec** を編集・検証・可視化するための OSS(リファレンス実装)。Vite + React 19 + TypeScript の SPA。
+taskaror は、YAML ベースのタスク定義フォーマット **TaskSpec** を編集・検証・可視化するための OSS(リファレンス実装)。npm workspaces のモノレポ構成で、共有コア(`packages/core`)と Vite + React 19 + TypeScript の SPA(`packages/web`)からなる(将来 `packages/cli` を追加予定)。
 
 - プロジェクト名は常に小文字の「taskaror」。文頭・見出しでも大文字にしない。「TaskSpec」はそのまま表記する。
 - ドキュメント・コードコメント・UI 文言・エラーメッセージは日本語で書く。
 
 ## コマンド
 
+すべてリポジトリルートで実行する(各パッケージへは npm workspaces 経由で委譲される)。
+
 ```bash
 npm run dev           # Vite dev server (HMR)
-npm run build         # tsc -b && vite build
+npm run build         # tsc -b && vite build(出力は packages/web/dist)
 npm run typecheck     # tsc -b(型チェックのみ)
-npm run test          # Vitest(1 回実行)
+npm run test          # Vitest(1 回実行。全パッケージ一括)
 npm run test:watch    # Vitest(watch モード)
 npm run lint          # ESLint
 npm run lint:fix
@@ -44,13 +46,21 @@ docker compose --profile prod up web --build  # 本番ビルド確認: nginx で
 
 ## アーキテクチャ
 
+### モノレポ構成(npm workspaces)
+
+- `packages/core`(`@taskaror/core`) — ブラウザ / React 非依存の共有コアロジック(`src/lib/`)と型定義(`src/types/`)。tsc ビルドせず TypeScript ソースをそのまま `exports` で公開する内部パッケージ(web は Vite が、将来の CLI はバンドラがソースを直接処理する)。`@taskaror/core/<module>` が `src/lib/<module>.ts`、`@taskaror/core/types/taskspec` が型定義に対応する
+- `packages/web`(`@taskaror/web`) — Vite + React 19 + TypeScript の SPA(GUI エディタ)
+- `schema/`・`examples/`・`docs/` はルート直下に置く。特に `schema/` は `$id` の URL パスとディレクトリ構造を一致させているため移動しない
+
+### TaskSpec とフォーマット同期
+
 TaskSpec は「仕様」、taskaror は「その実装のひとつ」という関係。仕様と実装が同居しているため、フォーマットを変更するときは以下の 3 箇所を同期させる必要がある:
 
 1. [schema/1.0/taskspec.schema.json](schema/1.0/taskspec.schema.json) — TaskSpec 1.0 の JSON Schema(draft 2020-12)。フォーマットの正。`$id` の URL パス(`schema/1.0/taskspec.schema.json`)とディレクトリ構造を一致させており、バージョン追加時は `schema/<version>/` を新設する。Ajv で検証する場合はデフォルトエクスポートではなく `ajv/dist/2020` の `Ajv2020` を使い、`format: "date"` のために ajv-formats を併用する
-2. [src/types/taskspec.ts](src/types/taskspec.ts) — スキーマと対応する TypeScript 型定義
-3. [src/lib/taskspec.ts](src/lib/taskspec.ts) — parse / serialize / flatten などのコアロジック(現状は最小限の構造チェックのみで、schema.json による完全バリデーションは未実装)
+2. [packages/core/src/types/taskspec.ts](packages/core/src/types/taskspec.ts) — スキーマと対応する TypeScript 型定義
+3. [packages/core/src/lib/taskspec.ts](packages/core/src/lib/taskspec.ts) — parse / serialize / flatten などのコアロジック(現状は最小限の構造チェックのみで、schema.json による完全バリデーションは未実装)
 
-[src/App.tsx](src/App.tsx) は [examples/ecommerce.taskspec.yaml](examples/ecommerce.taskspec.yaml) を `?raw` インポートして表示するサンプル UI。
+[packages/web/src/App.tsx](packages/web/src/App.tsx) は [examples/ecommerce.taskspec.yaml](examples/ecommerce.taskspec.yaml) を `?raw` インポートして表示するサンプル UI。
 
 ## TaskSpec の設計原則(コード変更時に守ること)
 

@@ -2,7 +2,7 @@
 
 TaskSpec は人の入力のみを保存し、開始日・終了日・期間などの導出値はレンダラーが計算する
 (Single Source of Truth)。この計算ルールをまとめる。実装は
-[src/lib/schedule.ts](../src/lib/schedule.ts) にあり、ブラウザ/React 非依存の純粋な
+[packages/core/src/lib/schedule.ts](../packages/core/src/lib/schedule.ts) にあり、ブラウザ/React 非依存の純粋な
 TypeScript として書かれている(将来 CLI の SVG ガント出力でも再利用する)。
 
 ## 前提となる決めごと
@@ -15,7 +15,7 @@ TypeScript として書かれている(将来 CLI の SVG ガント出力でも�
 - 期間 = `ceil(工数時間 / 8h)`
 - `estimate` 未指定の子なしタスクは 0d の**マイルストーン**(終了日 = 開始日、ひし形描画)
 
-実装: [src/lib/estimate.ts](../src/lib/estimate.ts) の `estimateToBusinessDays`。
+実装: [packages/core/src/lib/estimate.ts](../packages/core/src/lib/estimate.ts) の `estimateToBusinessDays`。
 
 ## 開始日
 
@@ -45,4 +45,4 @@ TypeScript として書かれている(将来 CLI の SVG ガント出力でも�
 
 - depends の循環参照や、依存が階層と絡んで計算が循環する入力でも例外を投げず、
   フォールバック(プロジェクト最早 start)で打ち切って結果を返す。
-  循環自体の検出・報告は [src/lib/validate.ts](../src/lib/validate.ts) が担う。
+  循環自体の検出・報告は [packages/core/src/lib/validate.ts](../packages/core/src/lib/validate.ts) が担う。

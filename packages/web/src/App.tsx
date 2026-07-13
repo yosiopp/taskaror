@@ -14,7 +14,7 @@ import {
   useState,
 } from 'react'
 import type { DragEvent } from 'react'
-import sampleSource from '../examples/ecommerce.taskspec.yaml?raw'
+import sampleSource from '../../../examples/ecommerce.taskspec.yaml?raw'
 import Toolbar from './components/Toolbar'
 import type { ViewMode } from './components/Toolbar'
 import TaskGrid from './components/TaskGrid'
@@ -40,33 +40,42 @@ import {
   maxGridWidth,
   parseStoredGridWidth,
 } from './components/paneWidth'
-import { canAddDependency, editorReducer, newTask } from './lib/editor'
+import { canAddDependency, editorReducer, newTask } from '@taskaror/core/editor'
 import type {
   AddMode,
   DropPosition,
   EditorAction,
   TaskFields,
-} from './lib/editor'
-import { canRedo, canUndo, initHistory, withHistory } from './lib/history'
-import { flattenTasks, serializeTaskSpec } from './lib/taskspec'
-import { parseTaskSpecDocument } from './lib/fidelity'
+} from '@taskaror/core/editor'
+import {
+  canRedo,
+  canUndo,
+  initHistory,
+  withHistory,
+} from '@taskaror/core/history'
+import { flattenTasks, serializeTaskSpec } from '@taskaror/core/taskspec'
+import { parseTaskSpecDocument } from '@taskaror/core/fidelity'
 import type { Document } from 'yaml'
-import { emptyTaskSpec, ganttImageFileName, taskSpecFileName } from './lib/file'
-import { validateTaskSpec } from './lib/validate'
-import { scheduleTasks } from './lib/schedule'
-import type { ScheduledTask } from './lib/schedule'
+import {
+  emptyTaskSpec,
+  ganttImageFileName,
+  taskSpecFileName,
+} from '@taskaror/core/file'
+import { validateTaskSpec } from '@taskaror/core/validate'
+import { scheduleTasks } from '@taskaror/core/schedule'
+import type { ScheduledTask } from '@taskaror/core/schedule'
 import {
   computeDayWindow,
   computeGanttLayout,
   filterCompleted,
   flattenScheduled,
   nextSelectionAfterRemoval,
-} from './lib/gantt'
-import type { DayWindow, GanttLayout, GanttRow } from './lib/gantt'
-import { renderGanttSvg } from './lib/ganttSvg'
-import { computeCriticalPath } from './lib/critical'
-import { formatDate, today as localToday } from './lib/date'
-import type { Task, TaskSpec } from './types/taskspec'
+} from '@taskaror/core/gantt'
+import type { DayWindow, GanttLayout, GanttRow } from '@taskaror/core/gantt'
+import { renderGanttSvg } from '@taskaror/core/ganttSvg'
+import { computeCriticalPath } from '@taskaror/core/critical'
+import { formatDate, today as localToday } from '@taskaror/core/date'
+import type { Task, TaskSpec } from '@taskaror/core/types/taskspec'
 
 interface Derived {
   visibleRows: GanttRow[]

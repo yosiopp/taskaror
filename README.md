@@ -96,7 +96,7 @@ npm install
 # 開発サーバーを起動(Vite / HMR、http://localhost:5173)
 npm run dev
 
-# 本番ビルド(tsc -b && vite build。出力は dist/)
+# 本番ビルド(tsc -b && vite build。出力は packages/web/dist/)
 npm run build
 
 # ビルド成果物のプレビュー
@@ -132,9 +132,13 @@ docker compose --profile prod up web --build
 
 ## アーキテクチャ
 
-Vite + React 19 + TypeScript の SPA です。将来的に CLI（linter / validator / SVG ガント出力）へ展開できるよう、コアロジック（検証・スケジュール導出・ガントのレイアウト計算）はブラウザ / React 非依存の純粋な TypeScript として `src/lib` に実装しています。
+npm workspaces のモノレポ構成です。
 
-CLI 化にあたっては、web と CLI を同一リポジトリに同居させるモノレポ構成（npm workspaces を基本線）へ移行し、共有コアを独立パッケージへ切り出す予定です。実行は `taskaror` を単一エントリとし、npx（`npx taskaror <command>`）または Docker（`docker run … taskaror <command>`）から行えるようにします（ネイティブバイナリ化はしません）。web の GUI も `taskaror serve` で起動する静的 SPA として提供し（従来どおり localStorage + ダウンロード/アップロードで、ファイルの直接編集はしません）、`validate` / `lint` / `svg` などのサブコマンドは spec ファイルを引数に取ります。
+- `packages/core`（`@taskaror/core`） — コアロジック（検証・スケジュール導出・ガントのレイアウト計算）と型定義。ブラウザ / React 非依存の純粋な TypeScript で、ビルドせずソースをそのまま公開する内部パッケージです
+- `packages/web`（`@taskaror/web`） — Vite + React 19 + TypeScript の SPA（GUI エディタ）
+- `schema/`・`examples/`・`docs/` はリポジトリルートに置きます（`schema/` は `$id` の URL パスとディレクトリ構造を一致させるため）
+
+CLI は `packages/cli` として同一リポジトリに追加予定で、共有コア（`@taskaror/core`）を web / CLI 双方から参照します。実行は `taskaror` を単一エントリとし、npx（`npx taskaror <command>`）または Docker（`docker run … taskaror <command>`）から行えるようにします（ネイティブバイナリ化はしません）。web の GUI も `taskaror serve` で起動する静的 SPA として提供し（従来どおり localStorage + ダウンロード/アップロードで、ファイルの直接編集はしません）、`validate` / `lint` / `svg` などのサブコマンドは spec ファイルを引数に取ります。
 
 ## 提供予定のツール群
 

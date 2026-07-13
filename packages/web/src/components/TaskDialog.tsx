@@ -6,10 +6,10 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import type { Task } from '../types/taskspec'
-import type { FlatTask } from '../lib/taskspec'
-import type { TaskFields } from '../lib/editor'
-import { collectAncestors, collectIds } from '../lib/editor'
+import type { Task } from '@taskaror/core/types/taskspec'
+import type { FlatTask } from '@taskaror/core/taskspec'
+import type { TaskFields } from '@taskaror/core/editor'
+import { collectAncestors, collectIds } from '@taskaror/core/editor'
 
 /** estimate の妥当な入力形式(空、または数値+h/d)。TaskGrid と同一 */
 const ESTIMATE_RE = /^\d+(\.\d+)?(h|d)$/

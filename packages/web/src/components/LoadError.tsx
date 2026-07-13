@@ -3,7 +3,7 @@
  * パースエラーは 1 件のメッセージを、検証エラーはパス付きの一覧を表示する。
  * 閉じるボタンでバナーを消せる(既存の編集内容はそのまま残る)。
  */
-import type { ValidationIssue } from '../lib/validate'
+import type { ValidationIssue } from '@taskaror/core/validate'
 
 export type LoadError =
   | { kind: 'parse'; message: string }

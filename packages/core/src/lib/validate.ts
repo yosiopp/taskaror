@@ -1,7 +1,7 @@
 import Ajv2020 from 'ajv/dist/2020'
 import type { ErrorObject, ValidateFunction } from 'ajv/dist/2020'
 import addFormats from 'ajv-formats'
-import schema from '../../schema/1.0/taskspec.schema.json'
+import schema from '../../../../schema/1.0/taskspec.schema.json'
 import type { Task, TaskSpec } from '../types/taskspec'
 
 /**

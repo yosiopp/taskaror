@@ -88,8 +88,8 @@
 > - **コアの分離方式は「モノレポ」に決定。** web(現行 SPA)と CLI を同一リポジトリに同居させ、共有するコアロジック(schedule / validate / ganttSvg 等の React 非依存部分)を独立パッケージに切り出して web / CLI 双方から参照する。npm workspaces での構成を基本線とする。
 > - 既存 `compose.yaml` の `dev` / `web` プロファイルは開発・確認用の便宜として残し、`taskaror serve` を製品レベルの統一起動コマンドとする。
 
-- [ ] モノレポ構成へ移行する(npm workspaces。web と CLI を同一リポジトリに置く)
-  - [ ] コアロジック(React 非依存の lib 群)を共有パッケージに切り出し、web / CLI から参照できるようにする
+- [x] モノレポ構成へ移行する(npm workspaces。web と CLI を同一リポジトリに置く)
+  - [x] コアロジック(React 非依存の lib 群)を共有パッケージに切り出し、web / CLI から参照できるようにする
 - [ ] CLI の基盤を作る(コマンド体系・引数設計。Node.js で実行し、npm の `bin` と Docker entrypoint の両方から呼べる形にする)
   - [ ] npx 経由の実行を用意する(package.json の `bin` 定義。`npx taskaror <command>` で動く)
   - [ ] Docker 経由の実行を用意する(`taskaror` を entrypoint にしたイメージ。`docker run` で動く)

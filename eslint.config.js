@@ -7,17 +7,23 @@ import prettier from 'eslint-config-prettier'
 import { globalIgnores } from 'eslint/config'
 
 export default tseslint.config([
-  globalIgnores(['dist']),
+  globalIgnores(['**/dist']),
+  // 全パッケージ共通: 素の TS 推奨設定(packages/core はブラウザ非依存のためここまで)
   {
     files: ['**/*.{ts,tsx}'],
+    extends: [js.configs.recommended, tseslint.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2023,
+    },
+  },
+  // packages/web のみ: React 系プラグイン+ブラウザグローバル
+  {
+    files: ['packages/web/**/*.{ts,tsx}'],
     extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
       reactHooks.configs.flat['recommended-latest'],
       reactRefresh.configs.vite,
     ],
     languageOptions: {
-      ecmaVersion: 2023,
       globals: globals.browser,
     },
   },

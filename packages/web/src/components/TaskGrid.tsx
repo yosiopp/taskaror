@@ -5,11 +5,11 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent, KeyboardEvent, ReactElement } from 'react'
-import type { GanttRow } from '../lib/gantt'
-import { collectAncestors } from '../lib/editor'
-import type { DropPosition, TaskFields } from '../lib/editor'
-import type { FlatTask } from '../lib/taskspec'
-import type { Task } from '../types/taskspec'
+import type { GanttRow } from '@taskaror/core/gantt'
+import { collectAncestors } from '@taskaror/core/editor'
+import type { DropPosition, TaskFields } from '@taskaror/core/editor'
+import type { FlatTask } from '@taskaror/core/taskspec'
+import type { Task } from '@taskaror/core/types/taskspec'
 import { GRID_COLUMNS, HEADER_HEIGHT, ROW_HEIGHT } from './constants'
 
 /** インライン編集できる列(依存は専用ポップオーバーのため含めない) */
