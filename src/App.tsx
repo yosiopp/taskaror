@@ -688,20 +688,45 @@ function App() {
     setSelectedId(succId)
   }
 
-  // タスク操作のショートカット(Insert=追加 / Delete=削除)。undo/redo と分けて張る。
-  // 入力欄・ダイアログ表示中・ガント編集ビュー以外では無効にする。handleAdd /
-  // handleRemove は毎レンダー再生成されるため依存に入れ、常に最新の状態で動かす。
+  // タスク操作のショートカット。undo/redo とは分けて張る。
+  //  - 修飾なし: Insert=追加 / Delete=削除
+  //  - Ctrl/Cmd+矢印: 上下移動(↑↓)・インデント(→)・アウトデント(←)
+  // 入力欄・ダイアログ表示中・ガント編集ビュー以外では無効にする。矢印系は選択タスクに
+  // 作用するので、素の矢印(行フォーカス移動・バーの開始日シフト)とは修飾キーで区別する。
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (isEditableTarget(event.target)) return
       if (dialogTaskId !== null || viewMode !== 'gantt') return
-      if (event.key === 'Insert') {
-        event.preventDefault()
-        handleAdd()
-      } else if (event.key === 'Delete') {
-        if (selectedId === null) return
-        event.preventDefault()
-        handleRemove()
+      const mod = event.ctrlKey || event.metaKey
+      if (!mod) {
+        if (event.key === 'Insert') {
+          event.preventDefault()
+          handleAdd()
+        } else if (event.key === 'Delete' && selectedId !== null) {
+          event.preventDefault()
+          handleRemove()
+        }
+        return
+      }
+      // Ctrl/Cmd+矢印は選択タスクに作用する(未選択なら何もしない)
+      if (selectedId === null) return
+      switch (event.key) {
+        case 'ArrowUp':
+          event.preventDefault()
+          dispatch({ type: 'moveTask', id: selectedId, direction: 'up' })
+          break
+        case 'ArrowDown':
+          event.preventDefault()
+          dispatch({ type: 'moveTask', id: selectedId, direction: 'down' })
+          break
+        case 'ArrowRight':
+          event.preventDefault()
+          dispatch({ type: 'indentTask', id: selectedId })
+          break
+        case 'ArrowLeft':
+          event.preventDefault()
+          dispatch({ type: 'outdentTask', id: selectedId })
+          break
       }
     }
     window.addEventListener('keydown', handleKeyDown)

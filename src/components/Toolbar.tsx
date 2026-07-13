@@ -65,6 +65,8 @@ interface ToolButton {
   onClick: () => void
   /** 選択中タスクがないと無効化する */
   needsSelection: boolean
+  /** ツールチップに併記するショートカットキー(例: 'Ctrl+↑') */
+  shortcut?: string
   danger?: boolean
 }
 
@@ -198,12 +200,19 @@ function Toolbar(props: ToolbarProps) {
   ]
 
   const tools: ToolButton[] = [
-    { icon: 'add', label: 'タスク追加', onClick: onAdd, needsSelection: false },
+    {
+      icon: 'add',
+      label: 'タスク追加',
+      onClick: onAdd,
+      needsSelection: false,
+      shortcut: 'Insert',
+    },
     {
       icon: 'delete',
       label: 'タスク削除',
       onClick: onRemove,
       needsSelection: true,
+      shortcut: 'Delete',
       danger: true,
     },
     {
@@ -211,24 +220,28 @@ function Toolbar(props: ToolbarProps) {
       label: 'アウトデント',
       onClick: onOutdent,
       needsSelection: true,
+      shortcut: 'Ctrl+←',
     },
     {
       icon: 'indent',
       label: 'インデント',
       onClick: onIndent,
       needsSelection: true,
+      shortcut: 'Ctrl+→',
     },
     {
       icon: 'moveUp',
       label: 'タスク移動↑',
       onClick: onMoveUp,
       needsSelection: true,
+      shortcut: 'Ctrl+↑',
     },
     {
       icon: 'moveDown',
       label: 'タスク移動↓',
       onClick: onMoveDown,
       needsSelection: true,
+      shortcut: 'Ctrl+↓',
     },
   ]
 
@@ -266,7 +279,11 @@ function Toolbar(props: ToolbarProps) {
               key={tool.icon}
               type="button"
               className={`tool-button${tool.danger ? ' danger' : ''}`}
-              title={tool.label}
+              // ツールチップ(title)には機能名とショートカットを併記する。
+              // aria-label は機能名のみにして操作対象を簡潔に読み上げさせる。
+              title={
+                tool.shortcut ? `${tool.label}(${tool.shortcut})` : tool.label
+              }
               aria-label={tool.label}
               disabled={tool.needsSelection && noSelection}
               onClick={tool.onClick}

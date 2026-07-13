@@ -193,6 +193,8 @@ function TaskGrid(props: TaskGridProps) {
     ) {
       return
     }
+    // Ctrl/Cmd+矢印はグローバルのタスク上下移動に委ねる(行フォーカス移動はしない)
+    if (event.ctrlKey || event.metaKey) return
     // セル編集中・依存チェックボックス等の入力にフォーカスがあるときは
     // 従来の Enter/Tab/Esc・入力操作を優先し、フォーカス移動と競合させない
     if (editing !== null || isFormField(event.target)) return

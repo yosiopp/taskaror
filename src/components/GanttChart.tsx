@@ -486,6 +486,8 @@ function Bar({
   }
 
   const handleKeyDown = (event: KeyboardEvent<SVGElement>): void => {
+    // Ctrl/Cmd+矢印はグローバルのタスク移動/インデントに委ねる(ここでは扱わない)
+    if (event.ctrlKey || event.metaKey) return
     switch (event.key) {
       case 'Enter':
       case ' ':

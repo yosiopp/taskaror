@@ -82,4 +82,42 @@ describe('App の UI', () => {
 
     expect(screen.getByText('新しいタスク')).toBeInTheDocument()
   })
+
+  it('ツールバーのツールチップにショートカットキーが表示される', () => {
+    render(<App />)
+    expect(screen.getByRole('button', { name: 'タスク移動↑' })).toHaveAttribute(
+      'title',
+      'タスク移動↑(Ctrl+↑)',
+    )
+    expect(screen.getByRole('button', { name: 'タスク移動↓' })).toHaveAttribute(
+      'title',
+      'タスク移動↓(Ctrl+↓)',
+    )
+    expect(screen.getByRole('button', { name: 'インデント' })).toHaveAttribute(
+      'title',
+      'インデント(Ctrl+→)',
+    )
+    expect(
+      screen.getByRole('button', { name: 'アウトデント' }),
+    ).toHaveAttribute('title', 'アウトデント(Ctrl+←)')
+  })
+
+  it('Ctrl+↑ で選択タスクを上に移動できる', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    // Insert で末尾に追加すると「新しいタスク」が最後の行かつ選択中になる
+    await user.keyboard('{Insert}')
+    const lastTitle = (): string | null | undefined => {
+      const titles = document.querySelectorAll('.cell-text.title')
+      return titles[titles.length - 1]?.textContent
+    }
+    expect(lastTitle()).toBe('新しいタスク')
+
+    // Ctrl+↑ で一つ上の兄弟と入れ替わり、最後の行ではなくなる
+    await user.keyboard('{Control>}{ArrowUp}{/Control}')
+    expect(lastTitle()).not.toBe('新しいタスク')
+    // 消えたわけではなく移動しただけ
+    expect(screen.getByText('新しいタスク')).toBeInTheDocument()
+  })
 })
