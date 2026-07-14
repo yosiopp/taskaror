@@ -6,7 +6,7 @@ TaskSpec は、人・AI・Git が扱いやすいことを重視した、軽量�
 
 📖 **ドキュメントサイト: <https://yosiopp.github.io/taskaror/>**（TaskSpec の仕様・操作方法・ヘルプ）
 
-![taskaror のガント編集ビュー。左に編集可能なタスクグリッド、右に SVG ガントチャートを表示](site/images/screenshot-gantt.png)
+![taskaror のガント編集ビュー。左に編集可能なタスクグリッド、右に SVG ガントチャートを表示](docs/site/images/screenshot-gantt.png)
 
 ## コンセプト
 
@@ -34,11 +34,11 @@ TaskSpec は、人・AI・Git が扱いやすいことを重視した、軽量�
 
 WBS 番号付きテーブルビュー。WBS 番号・開始日・終了日などの導出値を一覧できます。
 
-![WBS 番号付きテーブルビュー。WBS 番号・タスク名・期間を表形式で表示](site/images/screenshot-wbs.png)
+![WBS 番号付きテーブルビュー。WBS 番号・タスク名・期間を表形式で表示](docs/site/images/screenshot-wbs.png)
 
 YAML テキストビュー。YAML を直接編集し「適用」でモデルへ反映できます。
 
-![YAML テキストビュー。TaskSpec の YAML をテキストエリアで直接編集](site/images/screenshot-yaml.png)
+![YAML テキストビュー。TaskSpec の YAML をテキストエリアで直接編集](docs/site/images/screenshot-yaml.png)
 
 ## 使ってみる
 
@@ -77,7 +77,7 @@ docker run --rm -v $PWD:/work taskaror validate task.taskspec.yaml
 
 ## ドキュメント
 
-利用者向けドキュメントは GitHub Pages で公開しています（ソースは [site/](site/)）。
+利用者向けドキュメントは GitHub Pages で公開しています（ソースは [docs/site/](docs/site/)）。
 
 - [TaskSpec フォーマット](https://yosiopp.github.io/taskaror/taskspec/) — YAML フォーマットの仕様（フィールド一覧・拡張性・Non-Goals）
 - [GUI エディタの使い方](https://yosiopp.github.io/taskaror/gui/) — 操作方法・キーボードショートカット

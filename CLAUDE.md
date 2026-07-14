@@ -42,9 +42,9 @@ docker run --rm -p 5173:5173 taskaror serve  # CLI イメージで GUI を配信
 
 - **コミット** — 適度な粒度でコミットする。コミットメッセージは簡潔に 1 行で書き、Co-Authored-By などの AI エージェント情報は付けない
 - **セルフレビュー** — 定期的に `/code-review`・`/simplify` 相当のセルフレビュー・リファクタリングを行い、その結果をコミットする
-- **ドキュメント** — 実装とドキュメントを同期させながら更新する。公開/非公開で置き場所を分ける:
-  - `site/` — **利用者向け(GitHub Pages で公開)**: TaskSpec 仕様([site/taskspec.md](site/taskspec.md))・GUI/CLI の操作方法([site/gui.md](site/gui.md)・[site/cli.md](site/cli.md))・スケジュール導出([site/derivation.md](site/derivation.md))・lint ルール([site/lint.md](site/lint.md))
-  - `docs/` — **開発者向け(公開しない)**: 設計方針・決定記録は [docs/decisions.md](docs/decisions.md)、開発ガイドは [docs/development.md](docs/development.md)
+- **ドキュメント** — 実装とドキュメントを同期させながら更新する。ドキュメントは `docs/` 配下に集約し、公開/非公開で置き場所を分ける:
+  - `docs/site/` — **利用者向け(GitHub Pages で公開)**: TaskSpec 仕様([docs/site/taskspec.md](docs/site/taskspec.md))・GUI/CLI の操作方法([docs/site/gui.md](docs/site/gui.md)・[docs/site/cli.md](docs/site/cli.md))・スケジュール導出([docs/site/derivation.md](docs/site/derivation.md))・lint ルール([docs/site/lint.md](docs/site/lint.md))
+  - `docs/` 直下 — **開発者向け(公開しない)**: 設計方針・決定記録は [docs/decisions.md](docs/decisions.md)、開発ガイドは [docs/development.md](docs/development.md)
 - **テスト** — 必要ならテストコードも書く(コアロジックは原則テストを書く)
 - **タスク完了の条件** — 実装が終わったら動作確認(実際に動かす・テスト実行)をしてから、tasks.md の該当タスクにチェックをつける
 - **バージョン** — リリース時は root・packages/web・packages/cli の package.json の version を揃えて上げる(GUI 表示は web の version、CLI の --version は cli の version を使う)
@@ -56,7 +56,7 @@ docker run --rm -p 5173:5173 taskaror serve  # CLI イメージで GUI を配信
 - `packages/core`(`@taskaror/core`) — ブラウザ / React 非依存の共有コアロジック(`src/lib/`)と型定義(`src/types/`)。tsc ビルドせず TypeScript ソースをそのまま `exports` で公開する内部パッケージ(web は Vite が、cli は esbuild がソースを直接処理する)。`@taskaror/core/<module>` が `src/lib/<module>.ts`、`@taskaror/core/types/taskspec` が型定義に対応する
 - `packages/web`(`@taskaror/web`) — Vite + React 19 + TypeScript の SPA(GUI エディタ)
 - `packages/cli`(`taskaror`) — CLI。esbuild で単一 CJS(`dist/taskaror.cjs`)にバンドルし、ビルド済み web(`dist/web`)を同梱して配布する(ランタイム依存ゼロ)。サブコマンドは `src/cli.ts` のレジストリに「名前 → { 説明, 実行関数 }」で追記する。npx(`bin`)と Docker(`--target cli`、entrypoint)の両方から実行できる
-- `schema/`・`examples/`・`docs/`(開発者向けドキュメント)・`site/`(GitHub Pages で公開する利用者向けドキュメント。デプロイは .github/workflows/pages.yml)はルート直下に置く。特に `schema/` は `$id` の URL パスとディレクトリ構造を一致させているため移動しない
+- `schema/`・`examples/`・`docs/` はルート直下に置く。ドキュメントは `docs/` 配下に集約し、`docs/site/` だけを GitHub Pages で公開する(デプロイは .github/workflows/pages.yml)。特に `schema/` は `$id` の URL パスとディレクトリ構造を一致させているため移動しない
 
 ### TaskSpec とフォーマット同期
 

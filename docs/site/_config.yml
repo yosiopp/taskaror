@@ -1,4 +1,4 @@
-# GitHub Pages(Jekyll)の設定。site/ 配下が公開ドキュメントのソース。
+# GitHub Pages(Jekyll)の設定。docs/site/ 配下が公開ドキュメントのソース。
 # デプロイは .github/workflows/pages.yml が行う。
 title: taskaror
 description: YAML ベースのタスク定義フォーマット TaskSpec のエディタ・ツール群

@@ -183,7 +183,7 @@ export function scheduleTasks(
 /**
  * 各タスクの開始下限(祖先由来・depends 由来)を計算する。
  * scheduleTasks と同じ伝播ロジック(createResolver)を共有しており、
- * lint が明示 start との矛盾検出(site/lint.md)に使う。キーはタスクオブジェクト。
+ * lint が明示 start との矛盾検出(docs/site/lint.md)に使う。キーはタスクオブジェクト。
  */
 export function computeStartFloors(
   spec: TaskSpec,

@@ -75,21 +75,21 @@ TaskSpec のフォーマットを変更するときは、schema・型定義・�
 
 ## ドキュメントと GitHub Pages
 
-ドキュメントは公開/非公開で置き場所を分ける([decisions.md](decisions.md) の
-「ドキュメントの公開区分」参照)。
+ドキュメントは `docs/` 配下に集約し、公開/非公開で置き場所を分ける
+([decisions.md](decisions.md) の「ドキュメントの公開区分」参照)。
 
-- `site/` — 利用者向け(GitHub Pages で公開)。TaskSpec 仕様・GUI / CLI の操作方法・
-  スケジュール導出([../site/derivation.md](../site/derivation.md))・
-  lint ルール([../site/lint.md](../site/lint.md))
-- `docs/` — 開発者向け(公開しない)。本ファイルと [decisions.md](decisions.md)
+- `docs/site/` — 利用者向け(GitHub Pages で公開)。TaskSpec 仕様・GUI / CLI の操作方法・
+  スケジュール導出([site/derivation.md](site/derivation.md))・
+  lint ルール([site/lint.md](site/lint.md))
+- `docs/` 直下 — 開発者向け(公開しない)。本ファイルと [decisions.md](decisions.md)
 
 公開サイトは https://yosiopp.github.io/taskaror/ 。main への push
-(`site/**` の変更)を契機に .github/workflows/pages.yml が Jekyll でビルドして
+(`docs/site/**` の変更)を契機に .github/workflows/pages.yml が Jekyll でビルドして
 デプロイする。**初回のみ**リポジトリの Settings → Pages → Build and deployment →
 Source を「GitHub Actions」に設定する必要がある。
 
 ## 関連ドキュメント
 
 - [decisions.md](decisions.md) — 設計方針・決定記録
-- [../site/](../site/) — 利用者向けドキュメント(GitHub Pages のソース)
+- [site/](site/) — 利用者向けドキュメント(GitHub Pages のソース)
 - [tasks.md](../tasks.md) — 開発タスクの管理

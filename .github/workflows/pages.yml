@@ -1,4 +1,4 @@
-# site/(利用者向けドキュメント)を Jekyll でビルドして GitHub Pages に公開する。
+# docs/site/(利用者向けドキュメント)を Jekyll でビルドして GitHub Pages に公開する。
 # 初回のみ Settings → Pages → Build and deployment → Source を「GitHub Actions」に設定すること。
 name: GitHub Pages
 
@@ -6,7 +6,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'site/**'
+      - 'docs/site/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -33,7 +33,7 @@ jobs:
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:
-          source: ./site
+          source: ./docs/site
           destination: ./_site
 
       - name: Upload artifact
