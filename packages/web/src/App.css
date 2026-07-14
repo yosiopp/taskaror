@@ -996,6 +996,11 @@ body.is-gantt-linking * {
   border-color: var(--gantt-today);
 }
 
+/* ID 入力欄はヘッダの id 表示と同じ等幅フォントにする */
+.task-field-id input {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
 .task-field textarea {
   resize: vertical;
   min-height: 3.5rem;

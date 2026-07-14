@@ -8,6 +8,8 @@ import {
   generateTaskId,
   moveTaskTo,
   newTask,
+  renameTaskId,
+  validateTaskIdChange,
   type EditorAction,
 } from './editor'
 import { flattenTasks } from './taskspec'
@@ -194,6 +196,128 @@ describe('editorReducer: フィールド編集', () => {
     })
     expect(next.tasks[0].estimate).toBeUndefined()
     expect(next.tasks[0].assignees).toBeUndefined()
+  })
+
+  it('newId 付きで id とフィールドを 1 アクションで変更する(参照も置換)', () => {
+    const withDeps = spec([
+      { id: 'a', title: 'A', estimate: '1d' },
+      { id: 'b', title: 'B', depends: ['a'] },
+    ])
+    const next = editorReducer(withDeps, {
+      type: 'updateTask',
+      id: 'a',
+      changes: { title: 'AA', estimate: '2d' },
+      newId: 'a2',
+    })
+    expect(next.tasks[0]).toMatchObject({
+      id: 'a2',
+      title: 'AA',
+      estimate: '2d',
+    })
+    expect(next.tasks[1].depends).toEqual(['a2'])
+  })
+
+  it('newId が既存 id と重複するときは id を変えずフィールドのみ更新する', () => {
+    const withDup = spec([
+      { id: 'a', title: 'A' },
+      { id: 'b', title: 'B' },
+    ])
+    const next = editorReducer(withDup, {
+      type: 'updateTask',
+      id: 'a',
+      changes: { title: 'AA' },
+      newId: 'b',
+    })
+    expect(next.tasks[0]).toMatchObject({ id: 'a', title: 'AA' })
+  })
+})
+
+describe('renameTaskId', () => {
+  // a ← b(depends a)、b の子 b1 も a に依存。c は b1 に依存
+  const tree = (): Task[] => [
+    { id: 'a', title: 'A' },
+    {
+      id: 'b',
+      title: 'B',
+      depends: ['a'],
+      tasks: [{ id: 'b1', title: 'B1', depends: ['a', 'x'] }],
+    },
+    { id: 'c', title: 'C', depends: ['b1'] },
+  ]
+
+  it('id を変更する', () => {
+    const next = renameTaskId(tree(), 'a', 'a2')
+    expect(shape(next)).toBe('a2,b(b1),c')
+  })
+
+  it('depends 参照も一括置換する(他 id は保持)', () => {
+    const next = renameTaskId(tree(), 'a', 'a2')
+    expect(next.find((t) => t.id === 'b')?.depends).toEqual(['a2'])
+    expect(next.find((t) => t.id === 'b')?.tasks?.[0].depends).toEqual([
+      'a2',
+      'x',
+    ])
+  })
+
+  it('ネストされた子タスクの id と、そこへの参照も置換する', () => {
+    const next = renameTaskId(tree(), 'b1', 'impl')
+    expect(shape(next)).toBe('a,b(impl),c')
+    expect(next.find((t) => t.id === 'c')?.depends).toEqual(['impl'])
+  })
+
+  it('新 id が既存 id と重複するときは無変更(同一参照)', () => {
+    const tasks = tree()
+    expect(renameTaskId(tasks, 'a', 'b1')).toBe(tasks)
+  })
+
+  it('旧 id が存在しないときは無変更(同一参照)', () => {
+    const tasks = tree()
+    expect(renameTaskId(tasks, 'zzz', 'z2')).toBe(tasks)
+  })
+
+  it('旧 id と新 id が同じときは無変更(同一参照)', () => {
+    const tasks = tree()
+    expect(renameTaskId(tasks, 'a', 'a')).toBe(tasks)
+  })
+
+  it('純粋関数として元の配列を破壊しない', () => {
+    const tasks = tree()
+    renameTaskId(tasks, 'a', 'a2')
+    expect(shape(tasks)).toBe('a,b(b1),c')
+    expect(tasks.find((t) => t.id === 'b')?.depends).toEqual(['a'])
+  })
+})
+
+describe('validateTaskIdChange', () => {
+  const existing = new Set(['a', 'b', 'b1'])
+
+  it('妥当な新 id は null(エラーなし)', () => {
+    expect(validateTaskIdChange('task-1.x_2', 'a', existing)).toBeNull()
+  })
+
+  it('現 id と同じ値は重複にしない', () => {
+    expect(validateTaskIdChange('a', 'a', existing)).toBeNull()
+  })
+
+  it('空はエラー', () => {
+    expect(validateTaskIdChange('', 'a', existing)).toBe(
+      'id を入力してください',
+    )
+  })
+
+  it('形式違反はエラー(先頭が英字でない・使えない文字)', () => {
+    expect(validateTaskIdChange('1abc', 'a', existing)).toBe(
+      'id は英字で始まり、英数字と . _ - のみ使えます',
+    )
+    expect(validateTaskIdChange('a b', 'a', existing)).toBe(
+      'id は英字で始まり、英数字と . _ - のみ使えます',
+    )
+  })
+
+  it('既存 id との重複はエラー', () => {
+    expect(validateTaskIdChange('b1', 'a', existing)).toBe(
+      'この id は他のタスクで使われています',
+    )
   })
 })
 

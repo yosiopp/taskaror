@@ -1,15 +1,20 @@
 /**
  * タスクの全フィールドをまとめて編集するモーダルダイアログ。
- * グリッド行のダブルクリックで開き、title / estimate / start / 担当 / 依存 /
+ * グリッド行のダブルクリックで開き、id / title / estimate / start / 担当 / 依存 /
  * 進捗 / タグ / メモ をローカル下書きで編集し、[適用] で一括コミットする。
- * インライン編集(グリッドのセル)と違い、依存・タグ・メモも含めて編集できる。
+ * インライン編集(グリッドのセル)と違い、id・依存・タグ・メモも含めて編集できる。
+ * id を変更した場合、適用時に参照箇所(depends)も一括置換される(editor の renameTaskId)。
  */
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Task } from '@taskaror/core/types/taskspec'
 import type { FlatTask } from '@taskaror/core/taskspec'
 import type { TaskFields } from '@taskaror/core/editor'
-import { collectAncestors, collectIds } from '@taskaror/core/editor'
+import {
+  collectAncestors,
+  collectIds,
+  validateTaskIdChange,
+} from '@taskaror/core/editor'
 
 /** estimate の妥当な入力形式(空、または数値+h/d)。TaskGrid と同一 */
 const ESTIMATE_RE = /^\d+(\.\d+)?(h|d)$/
@@ -21,11 +26,12 @@ export interface TaskDialogProps {
   allTasks: FlatTask[]
   /** 閉じる(キャンセル) */
   onClose: () => void
-  /** 変更をまとめて確定する(1 履歴にまとまる) */
-  onSubmit: (changes: Partial<TaskFields>) => void
+  /** 変更をまとめて確定する(1 履歴にまとまる)。id を変更した場合のみ newId を渡す */
+  onSubmit: (changes: Partial<TaskFields>, newId?: string) => void
 }
 
 function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
+  const [taskId, setTaskId] = useState(task.id)
   const [title, setTitle] = useState(task.title)
   const [estimate, setEstimate] = useState(task.estimate ?? '')
   const [start, setStart] = useState(task.start ?? '')
@@ -39,7 +45,7 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
 
   const titleRef = useRef<HTMLInputElement>(null)
 
-  // 開いたら最初のフィールドにフォーカスする
+  // 開いたらタスク名にフォーカスする(id の変更は例外的な操作のため ID 欄には当てない)
   useEffect(() => {
     titleRef.current?.focus()
   }, [])
@@ -66,6 +72,13 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
   const estimateInvalid =
     estimate.trim() !== '' && !ESTIMATE_RE.test(estimate.trim())
 
+  // id の検証(空・形式違反・他タスクとの重複)。エラーがある間は適用できない
+  const idError = validateTaskIdChange(
+    taskId.trim(),
+    task.id,
+    new Set(allTasks.map((flat) => flat.task.id)),
+  )
+
   const toggleDepend = (id: string): void => {
     setDepends((prev) =>
       prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id],
@@ -74,22 +87,27 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
 
   const handleSubmit = (event: FormEvent): void => {
     event.preventDefault()
-    if (estimateInvalid) return
+    if (estimateInvalid || idError !== null) return
     const trimmedProgress = progress.trim()
     const progressNum =
       trimmedProgress === ''
         ? undefined
         : clamp(Math.round(Number(trimmedProgress)), 0, 100)
-    onSubmit({
-      title: title.trim(),
-      estimate: estimate.trim(),
-      start: start.trim(),
-      assignees: splitCsv(assignees),
-      depends,
-      progress: Number.isNaN(progressNum as number) ? undefined : progressNum,
-      tags: splitCsv(tags),
-      note,
-    })
+    const trimmedId = taskId.trim()
+    onSubmit(
+      {
+        title: title.trim(),
+        estimate: estimate.trim(),
+        start: start.trim(),
+        assignees: splitCsv(assignees),
+        depends,
+        progress: Number.isNaN(progressNum as number) ? undefined : progressNum,
+        tags: splitCsv(tags),
+        note,
+      },
+      // id を変更したときだけ newId を渡す(参照の一括置換を伴うため)
+      trimmedId !== task.id ? trimmedId : undefined,
+    )
   }
 
   return (
@@ -123,6 +141,19 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
         </div>
 
         <div className="task-dialog-body">
+          <label className="task-field task-field-id">
+            <span className="task-field-label">ID</span>
+            <input
+              type="text"
+              value={taskId}
+              aria-invalid={idError !== null}
+              onChange={(e) => setTaskId(e.target.value)}
+            />
+            {idError !== null ? (
+              <span className="task-field-error">{idError}</span>
+            ) : null}
+          </label>
+
           <label className="task-field task-field-wide">
             <span className="task-field-label">タスク名</span>
             <input
@@ -229,7 +260,11 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
           <button type="button" onClick={onClose}>
             キャンセル
           </button>
-          <button type="submit" className="primary" disabled={estimateInvalid}>
+          <button
+            type="submit"
+            className="primary"
+            disabled={estimateInvalid || idError !== null}
+          >
             適用
           </button>
         </div>

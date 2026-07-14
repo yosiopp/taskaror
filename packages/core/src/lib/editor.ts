@@ -26,7 +26,13 @@ export type DropPosition = 'before' | 'after' | 'child'
 export type EditorAction =
   | { type: 'addTask'; task: Task; mode: AddMode; targetId?: string }
   | { type: 'removeTask'; id: string }
-  | { type: 'updateTask'; id: string; changes: Partial<TaskFields> }
+  | {
+      type: 'updateTask'
+      id: string
+      changes: Partial<TaskFields>
+      /** id も変更する場合の新 id(参照している depends も一括置換する) */
+      newId?: string
+    }
   | { type: 'indentTask'; id: string }
   | { type: 'outdentTask'; id: string }
   | { type: 'moveTask'; id: string; direction: 'up' | 'down' }
@@ -48,13 +54,19 @@ export function editorReducer(spec: TaskSpec, action: EditorAction): TaskSpec {
       return addTask(spec, action)
     case 'removeTask':
       return removeTask(spec, action.id)
-    case 'updateTask':
+    case 'updateTask': {
+      // newId があれば先に id を変更(depends 参照も一括置換)し、フィールド変更を続ける
+      const tasks =
+        action.newId !== undefined
+          ? renameTaskId(spec.tasks, action.id, action.newId)
+          : spec.tasks
+      // id 変更が無効(重複等)で無変更だったときは元の id を対象にする
+      const id = tasks === spec.tasks ? action.id : action.newId!
       return withTasks(
         spec,
-        mapTask(spec.tasks, action.id, (task) =>
-          applyFieldChanges(task, action.changes),
-        ),
+        mapTask(tasks, id, (task) => applyFieldChanges(task, action.changes)),
       )
+    }
     case 'indentTask':
       return withTasks(spec, indentTask(spec.tasks, action.id))
     case 'outdentTask':
@@ -344,6 +356,56 @@ export function collectAncestors(
     }
   }
   return result
+}
+
+// --- id 変更 ---
+
+/** タスク id の形式(schema/1.0 の task.id の pattern と同じ) */
+export const TASK_ID_PATTERN = /^[A-Za-z][A-Za-z0-9._-]*$/
+
+/**
+ * タスク id の変更内容を検証し、問題があれば日本語のエラーメッセージを返す(なければ null)。
+ * existingIds には全タスクの id を渡す(currentId を含んでいてよい。自身との一致は重複にしない)。
+ */
+export function validateTaskIdChange(
+  newId: string,
+  currentId: string,
+  existingIds: Set<string>,
+): string | null {
+  if (newId === '') return 'id を入力してください'
+  if (!TASK_ID_PATTERN.test(newId)) {
+    return 'id は英字で始まり、英数字と . _ - のみ使えます'
+  }
+  if (newId !== currentId && existingIds.has(newId)) {
+    return 'この id は他のタスクで使われています'
+  }
+  return null
+}
+
+/**
+ * タスク id を変更し、参照箇所(全階層の depends)も新 id へ一括置換する(純粋関数)。
+ * TaskSpec で id を参照するのは depends のみ(親子関係はネストで表現し、id 参照ではない)。
+ * 旧 id が存在しない・新 id が既存 id と重複する・両者が同じときは元の配列をそのまま返す。
+ */
+export function renameTaskId(
+  tasks: Task[],
+  oldId: string,
+  newId: string,
+): Task[] {
+  if (oldId === newId) return tasks
+  const ids = collectIds(tasks)
+  if (!ids.has(oldId) || ids.has(newId)) return tasks
+  const walk = (list: Task[]): Task[] =>
+    list.map((task): Task => {
+      const next: Task = { ...task }
+      if (next.id === oldId) next.id = newId
+      if (next.depends?.includes(oldId)) {
+        next.depends = next.depends.map((dep) => (dep === oldId ? newId : dep))
+      }
+      if (next.tasks) next.tasks = walk(next.tasks)
+      return next
+    })
+  return walk(tasks)
 }
 
 // --- フィールド編集 ---

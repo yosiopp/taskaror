@@ -701,6 +701,30 @@ function App() {
     dispatch({ type: 'updateTask', id, changes })
   }
 
+  /**
+   * 編集ダイアログの確定。newId があれば id 変更(depends 参照の一括置換)も含めて
+   * 1 アクションで適用する(1 履歴にまとまる)。id を参照するビュー状態
+   * (選択・折りたたみ)も新 id へ追従させる。
+   */
+  const handleDialogSubmit = (
+    id: string,
+    changes: Partial<TaskFields>,
+    newId?: string,
+  ): void => {
+    dispatch({ type: 'updateTask', id, changes, newId })
+    if (newId !== undefined) {
+      if (selectedId === id) setSelectedId(newId)
+      setCollapsedIds((prev) => {
+        if (!prev.has(id)) return prev
+        const next = new Set(prev)
+        next.delete(id)
+        next.add(newId)
+        return next
+      })
+    }
+    setDialogTaskId(null)
+  }
+
   /** ダブルクリックで編集ダイアログを開く(対象を選択もする) */
   const handleOpenDialog = (id: string): void => {
     selectTask(id)
@@ -1059,10 +1083,9 @@ function App() {
           task={dialogTask}
           allTasks={allTasks}
           onClose={() => setDialogTaskId(null)}
-          onSubmit={(changes) => {
-            dispatch({ type: 'updateTask', id: dialogTask.id, changes })
-            setDialogTaskId(null)
-          }}
+          onSubmit={(changes, newId) =>
+            handleDialogSubmit(dialogTask.id, changes, newId)
+          }
         />
       ) : null}
 
