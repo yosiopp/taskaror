@@ -11,7 +11,7 @@ import MenuBar from './MenuBar'
 import type { Menu } from './MenuBar'
 import { Icon } from './icons'
 import type { IconName } from './icons'
-import { REPOSITORY_URL } from '../appInfo'
+import { DOCS_URL, REPOSITORY_URL } from '../appInfo'
 
 /** 本文のビューモード(ガント編集 / YAML テキスト / WBS 表) */
 export type ViewMode = 'gantt' | 'yaml' | 'wbs'
@@ -231,6 +231,11 @@ function Toolbar(props: ToolbarProps) {
     {
       label: 'ヘルプ',
       items: [
+        {
+          kind: 'link',
+          label: '使い方',
+          href: DOCS_URL,
+        },
         {
           kind: 'link',
           label: 'GitHub リポジトリ',

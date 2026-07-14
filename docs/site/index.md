@@ -23,5 +23,5 @@ Docker でも実行できます。詳しくは [CLI の使い方](cli.md) を参
 ## ヘルプ
 
 - 不具合報告・要望は [GitHub Issues](https://github.com/yosiopp/taskaror/issues) へ
-- GUI エディタの [ヘルプ] メニューから GitHub リポジトリとバージョン情報を参照できます
+- GUI エディタの [ヘルプ] → [使い方] からこのドキュメントサイトを開けます。GitHub リポジトリとバージョン情報も同メニューから参照できます
 - ライセンスは Apache License 2.0 です([LICENSE](https://github.com/yosiopp/taskaror/blob/main/LICENSE))

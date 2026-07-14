@@ -111,11 +111,19 @@ describe('App の UI', () => {
     )
   })
 
-  it('[ヘルプ]メニューに GitHub リンクと [taskaror について] がある', async () => {
+  it('[ヘルプ]メニューに [使い方]・GitHub リンク・[taskaror について] がある', async () => {
     const user = userEvent.setup()
     render(<App />)
 
     await user.click(screen.getByRole('menuitem', { name: 'ヘルプ' }))
+
+    // ドキュメントサイトへのリンク(新規タブで開く)
+    const docsLink = screen.getByRole('menuitem', { name: /使い方/ })
+    expect(docsLink).toHaveAttribute(
+      'href',
+      'https://yosiopp.github.io/taskaror/',
+    )
+    expect(docsLink).toHaveAttribute('target', '_blank')
 
     // GitHub リポジトリへのリンク(新規タブで開く)
     const link = screen.getByRole('menuitem', { name: /GitHub リポジトリ/ })

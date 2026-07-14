@@ -11,3 +11,6 @@ export const APP_VERSION = __APP_VERSION__
 
 /** GitHub リポジトリ URL([ヘルプ] のリンク先) */
 export const REPOSITORY_URL = 'https://github.com/yosiopp/taskaror'
+
+/** ドキュメントサイト URL([ヘルプ] → [使い方] のリンク先) */
+export const DOCS_URL = 'https://yosiopp.github.io/taskaror/'
