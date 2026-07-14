@@ -1,6 +1,6 @@
 # taskaror
 
-**taskaror** は、YAML ベースのタスク定義フォーマット **TaskSpec** を編集・検証・可視化するためのオープンソースプロジェクトです。ブラウザ上で動くガントチャートエディタを備え、GUI で編集した内容をリアルタイムにガントへ反映し、`.taskspec.yaml` として保存できます。
+**taskaror** は、YAML ベースのタスク定義フォーマット **TaskSpec** を編集・検証・可視化するためのオープンソースプロジェクトです。ブラウザ上で動くガントチャートエディタを備え、GUI で編集した内容をリアルタイムにガントへ反映し、`.taskspec.yaml` として保存できます。あわせて、検証・lint・SVG 出力を行う CLI を提供します。
 
 TaskSpec は、人・AI・Git が扱いやすいことを重視した、軽量な WBS（Work Breakdown Structure）・ガントチャート向けデータフォーマットです。taskaror はそのリファレンス実装およびツール群を提供します。
 
@@ -19,16 +19,14 @@ TaskSpec は、人・AI・Git が扱いやすいことを重視した、軽量�
 
 ## 主な機能
 
-- **ガントチャートエディタ** — 左は編集可能なタスクグリッド（インライン編集・行選択・階層の展開/折りたたみ）、右は自前の SVG ガント。左右は行が揃い、境界をドラッグしてペイン幅を変更できます。
-- **スケジュール自動導出** — 見積工数（`1.5d` / `4h`、1d = 8h）・依存（`depends`）・営業日（土日スキップ）から開始日・終了日を計算します。親タスクはサマリーバー、見積のない子タスクは 0d のマイルストーン（ひし形）として描画し、今日線と依存矢印を表示します。導出値は保存しません（Single Source of Truth）。
-- **ナビゲーション** — 2 行構成のヘッダ。1 行目はアプリ名・プロジェクトタイトル・メニューバー（ファイル / 編集 / 表示）、2 行目は Material Icons のツールバー（タスク追加・削除・アウトデント／インデント・上下移動）です。メニューは外側クリック・Esc・キーボード操作に対応します。
-- **編集操作** — ツールバーでの追加・削除・階層変更・上下移動に加え、ドラッグ&ドロップでの階層移動、バーのドラッグで開始日、右端のドラッグで見積を変更できます。タスクをダブルクリックすると全フィールド（title / estimate / start / 担当 / 依存 / 進捗 / タグ / メモ）を編集できるダイアログが開き、グリッド下部の空行クリックで新規タスクを追加できます（スプレッドシート風）。
-- **依存関係の入力** — 既存タスクからの選択式（グリッドのポップオーバー・編集ダイアログ）に加え、ガント上でバー端の接続ハンドルから対象バーへドラッグしても設定できます。自分自身・子孫・祖先・循環になる向きは候補から除外し、論理的な循環を防ぎます。
-- **キーボード操作 / アクセシビリティ** — セル編集（Enter / Tab / Esc）、↑ / ↓ での行フォーカス移動、ガントバーの Tab フォーカスと矢印キー操作、メニューバーの矢印キー操作、Undo / Redo（Cmd/Ctrl+Z、Cmd/Ctrl+Shift+Z、Ctrl+Y）に対応。タスク操作はショートカットでも実行できます（Insert=追加、Delete=削除、Ctrl+↑ / ↓=上下移動、Ctrl+→ / ←=インデント / アウトデント）。メニュー項目・ツールバーのツールチップにショートカットを併記します。
-- **ビュー切り替え** — 表示メニューから ガントチャート / YAML テキストビュー（編集して「適用」でモデルへ反映）/ WBS 番号付きテーブルビュー を切り替えられます。
-- **ファイル入出力** — 新規作成、`.taskspec.yaml` としてのダウンロード保存、ファイル選択＋ドラッグ&ドロップでの読み込み、パース／検証エラーの表示、localStorage への自動保存（リロードで作業が消えません）。
-- **YAML の忠実性** — 読み込んだ YAML の未変更部分について、コメント・キー順・引用符スタイルを保持します（yaml の Document API を利用）。
-- **その他** — クリティカルパスのハイライト、完了タスク（進捗 100%）の非表示フィルタ、SVG / PNG エクスポート、遠い未来日でも軽快に動く日カラムの仮想化。
+- **ガントチャートエディタ** — 左は編集可能なタスクグリッド、右は自前の SVG ガント。左右は行が揃い、境界をドラッグしてペイン幅を変更できます
+- **スケジュール自動導出** — 見積工数（`1.5d` / `4h`、1d = 8h）・依存・営業日（土日スキップ）から開始日・終了日を計算します（規則は [docs/derivation.md](docs/derivation.md)）。導出値は保存しません
+- **直感的な編集** — インライン編集・ダブルクリックの編集ダイアログ・ドラッグ&ドロップでの階層移動・ガントバーのドラッグでの日程調整・依存線のドラッグ設定
+- **ビュー切り替え** — ガントチャート / YAML テキスト / WBS 番号付きテーブル
+- **YAML の忠実性** — 読み込んだ YAML の未変更部分について、コメント・キー順・引用符スタイルを保持します
+- **検証と lint** — JSON Schema + 構造の検証、スケジュール導出から見た矛盾の検出（CLI）
+- **キーボード操作 / アクセシビリティ** — 主要操作のショートカット、メニュー・ガントバーのキーボード操作に対応
+- **その他** — クリティカルパスの強調、完了タスクの非表示、SVG / PNG エクスポート、localStorage への自動保存
 
 ## スクリーンショット
 
@@ -40,9 +38,93 @@ YAML テキストビュー。YAML を直接編集し「適用」でモデルへ�
 
 ![YAML テキストビュー。TaskSpec の YAML をテキストエリアで直接編集](docs/images/screenshot-yaml.png)
 
+## 使ってみる
+
+GUI エディタは `taskaror serve` で起動します（npx 実行には Node.js 20 以上が必要です）。
+
+```bash
+# npx 経由
+npx taskaror serve                # http://127.0.0.1:5173 で GUI エディタを配信
+npx taskaror serve --port 8080    # ポートを変更(--host で bind 先も変更可)
+
+# Docker 経由(taskaror が entrypoint のイメージ)
+docker build --target cli -t taskaror .
+docker run --rm -p 5173:5173 taskaror serve
+```
+
+リポジトリから直接使う場合は、ルートで `npm install && npm run build` した後に `npm exec taskaror -- serve` を実行します。
+
+## GUI エディタの使い方
+
+### ファイルの作成・読み込み・保存
+
+- **新規作成** — メニューの [ファイル] → [新規]
+- **読み込み** — [ファイル] → [開く…] でファイルを選択するか、`.taskspec.yaml` をウィンドウへドラッグ&ドロップします。パース・検証エラーは画面に表示されます
+- **保存** — [ファイル] → [保存] で `.taskspec.yaml` としてダウンロードします（ファイル名は `info.title` から導出）
+- 編集内容は localStorage に自動保存されるため、リロードしても作業は消えません
+
+### タスクの追加・編集
+
+- **追加** — ツールバーの [タスク追加]（または Insert キー）。スプレッドシート風に、グリッド下部の空行をクリック・空行で入力しても新規タスクを作成できます（行が足りなければ最下端の「○行 追加」で増やせます）
+- **インライン編集** — グリッドのセルをクリックして直接編集します（Enter で確定、Tab で隣のセルへ、Esc で取消）
+- **詳細編集** — タスクをダブルクリックすると、全フィールド（title / estimate / start / 担当 / 依存 / 進捗 / タグ / メモ）を編集できるダイアログが開きます
+- **削除** — [タスク削除]（または Delete キー）。[編集] メニューの [元に戻す] / [やり直し] でいつでも取り消せます
+
+### 階層と並び替え
+
+- ツールバーまたは [編集] メニューの [インデント] / [アウトデント] で階層を、[タスク移動↑] / [タスク移動↓] で並び順を変更します
+- グリッドの行をドラッグ&ドロップしても階層・位置を移動できます
+- 親タスク（子を持つタスク）はサマリーバーとして描画され、期間は子の包絡から自動計算されます
+
+### スケジュールと依存関係（ガント上の操作）
+
+- **開始日の変更** — ガントバー本体を左右にドラッグします（`start` に反映）
+- **見積の変更** — バーの右端をドラッグして伸縮します（`estimate` に反映）
+- **依存の追加** — バー端の接続ハンドルから対象のバーへドラッグします（右端から=後続を設定、左端から=先行を設定）。自分自身・子孫・祖先・循環になる向きは設定できません
+- **依存の削除** — 依存線をクリックして選択し、Delete キーで削除します
+- 見積のない子なしタスクは 0d のマイルストーン（ひし形）として描画されます
+
+### 表示の切り替えとエクスポート
+
+- [表示] メニューで **ガントチャート / YAML / WBS表** を切り替えます。YAML ビューでは直接編集して「適用」でモデルへ反映できます
+- [表示] → [クリティカルパスを強調] / [完了タスクを非表示]（進捗 100% を完了とみなすビューのフィルタ）
+- [ファイル] → [エクスポート(SVG)] / [エクスポート(PNG)] でガントチャートを画像として書き出します
+
+### キーボードショートカット
+
+| 操作                               | キー                                           |
+| ---------------------------------- | ---------------------------------------------- |
+| タスク追加 / 削除                  | Insert / Delete                                |
+| タスク移動 ↑ / ↓                   | Ctrl+↑ / Ctrl+↓                                |
+| インデント / アウトデント          | Ctrl+→ / Ctrl+←                                |
+| 元に戻す / やり直し                | Cmd/Ctrl+Z / Cmd/Ctrl+Shift+Z（Ctrl+Y でも可） |
+| 行フォーカスの移動                 | ↑ / ↓                                          |
+| セル編集の確定 / 隣のセルへ / 取消 | Enter / Tab / Esc                              |
+
+ガントバーは Tab でフォーカスして矢印キーでも操作できます。各ショートカットはメニュー項目にも併記されています。
+
+## CLI
+
+`taskaror` コマンドは `serve` のほかに、spec ファイルを引数に取るサブコマンドを提供します。
+
+```bash
+npx taskaror --help               # 使い方を表示(各サブコマンドは <command> --help)
+npx taskaror validate task.taskspec.yaml    # JSON Schema+構造の検証(複数ファイル可)
+npx taskaror lint task.taskspec.yaml        # スケジュール導出から見た矛盾・怪しい記述を検出
+npx taskaror svg task.taskspec.yaml                 # ガントチャート SVG を標準出力へ
+npx taskaror svg task.taskspec.yaml -o gantt.svg    # ファイルへ書き出し(--output でも可)
+
+# Docker では、カレントディレクトリを /work にマウントして渡す
+docker run --rm -v $PWD:/work taskaror validate task.taskspec.yaml
+docker run --rm -v $PWD:/work taskaror lint task.taskspec.yaml
+docker run --rm -v $PWD:/work taskaror svg task.taskspec.yaml -o gantt.svg
+```
+
+`validate` / `lint` は問題を検出すると終了コード 1 を返すため、CI にも組み込めます。lint のルールは [docs/lint.md](docs/lint.md) を参照してください。
+
 ## TaskSpec
 
-TaskSpec は taskaror が採用する YAML ベースの仕様です。
+TaskSpec は taskaror が採用する YAML ベースの仕様です。JSON Schema は [schema/1.0/taskspec.schema.json](schema/1.0/taskspec.schema.json) にあります。
 
 ```yaml
 taskspec: '1.0'
@@ -67,7 +149,7 @@ tasks:
       - design
 ```
 
-保持する情報は、タスク階層・タスク名・見積工数・依存関係・担当者・進捗・タグ・メモのみ。これ以外はレンダラーが導出します。
+保持する情報は、タスク階層・タスク名・見積工数・依存関係・担当者・進捗・タグ・メモのみ。開始日・終了日・WBS 番号などはレンダラーが導出します（規則は [docs/derivation.md](docs/derivation.md)）。サンプルは [examples/](examples/) にあります。
 
 ### 拡張性
 
@@ -85,93 +167,28 @@ tasks:
 
 リソース管理・勤務カレンダー・コスト管理・EVM・ポートフォリオ管理・スケジューリングアルゴリズム・UI の挙動は仕様の対象外とし、各実装や周辺ツールの責務とします。
 
-## 使い方 / 開発
+## ドキュメント
 
-Node.js（推奨: v24 系）と npm が必要です。
+- [docs/derivation.md](docs/derivation.md) — スケジュール導出ルール（開始日・終了日・親タスクの計算規則）
+- [docs/lint.md](docs/lint.md) — `taskaror lint` のルール仕様
+- [docs/decisions.md](docs/decisions.md) — 設計方針・決定記録
+- [docs/development.md](docs/development.md) — 開発ガイド（セットアップ・コマンド・アーキテクチャ）
 
-```bash
-# 依存関係のインストール
-npm install
+## 開発
 
-# 開発サーバーを起動(Vite / HMR、http://localhost:5173)
-npm run dev
+npm workspaces のモノレポ構成（共有コア `packages/core` / GUI `packages/web` / CLI `packages/cli`）です。開発環境のセットアップ・コマンド・アーキテクチャの詳細は [docs/development.md](docs/development.md) を参照してください。
 
-# 本番ビルド(tsc -b → web → cli の順。packages/web/dist/ と packages/cli/dist/ に出力)
-npm run build
+## ロードマップ
 
-# ビルド成果物のプレビュー
-npm run preview
-```
+提供済み:
 
-### CLI(taskaror コマンド)
+- TaskSpec JSON Schema / バリデーター（`taskaror validate`）/ Linter（`taskaror lint`）
+- CLI（npx / Docker で実行する `taskaror` コマンド）
+- WBS・ガントチャートレンダラー（GUI と `taskaror svg` の SVG 出力）
 
-CLI は `taskaror` を単一エントリとし、npx または Docker から実行できます(npx 実行には Node.js 20 以上が必要です)。現在のサブコマンドは `serve` / `validate` / `lint` / `svg` です。
+今後の予定:
 
-```bash
-# npx 経由(要 Node.js)
-npx taskaror --help               # 使い方を表示
-npx taskaror serve                # GUI エディタを配信(http://127.0.0.1:5173)
-npx taskaror serve --port 8080    # ポートを変更(--host で bind 先も変更可)
-npx taskaror validate task.taskspec.yaml    # spec を検証(複数ファイル可)
-npx taskaror lint task.taskspec.yaml        # スケジュール導出から見た矛盾・怪しい記述を検出(ルールは docs/lint.md)
-npx taskaror svg task.taskspec.yaml                 # ガントチャート SVG を標準出力へ
-npx taskaror svg task.taskspec.yaml -o gantt.svg    # ファイルへ書き出し(--output でも可)
-
-# Docker 経由(taskaror が entrypoint のイメージ)
-docker build --target cli -t taskaror .
-docker run --rm taskaror --help
-docker run --rm -p 5173:5173 taskaror serve
-# ファイルを引数に取るコマンドは、カレントディレクトリを /work にマウントして渡す
-docker run --rm -v $PWD:/work taskaror validate task.taskspec.yaml
-docker run --rm -v $PWD:/work taskaror lint task.taskspec.yaml
-docker run --rm -v $PWD:/work taskaror svg task.taskspec.yaml -o gantt.svg
-```
-
-`serve` が配信する web は静的 SPA のままです。編集内容は従来どおり localStorage とダウンロード/アップロードで扱うため、ファイルのマウントは不要です。リポジトリ内では、ルートで `npm run build` した後に `npm exec taskaror -- serve` でも実行できます。
-
-### テスト・静的解析
-
-コアロジック（検証・スケジュール導出・ガントのレイアウト計算）は Vitest でテストしています。
-
-```bash
-npm run test          # Vitest(1 回実行)
-npm run test:watch    # Vitest(watch モード)
-
-npm run typecheck     # 型チェック(tsc -b)
-npm run lint          # ESLint
-npm run lint:fix      # ESLint(自動修正)
-npm run format        # Prettier(整形)
-npm run format:check  # Prettier(チェックのみ)
-```
-
-### Docker
-
-Docker でも開発サーバーの起動と本番ビルドの確認ができます。
-
-```bash
-# 開発用: Vite dev server(http://localhost:5173)
-docker compose up dev
-
-# 本番ビルド確認: nginx で dist を配信(http://localhost:8080)
-docker compose --profile prod up web --build
-```
-
-## アーキテクチャ
-
-npm workspaces のモノレポ構成です。
-
-- `packages/core`（`@taskaror/core`） — コアロジック（検証・スケジュール導出・ガントのレイアウト計算）と型定義。ブラウザ / React 非依存の純粋な TypeScript で、ビルドせずソースをそのまま公開する内部パッケージです
-- `packages/web`（`@taskaror/web`） — Vite + React 19 + TypeScript の SPA（GUI エディタ）
-- `packages/cli`（`taskaror`） — CLI。esbuild で単一の CJS（`dist/taskaror.cjs`）にバンドルし、ビルド済みの web（`dist/web`）を同梱して配布します（ランタイム依存なし）
-- `schema/`・`examples/`・`docs/` はリポジトリルートに置きます（`schema/` は `$id` の URL パスとディレクトリ構造を一致させるため）
-
-CLI は `taskaror` を単一エントリとし、npx（`npx taskaror <command>`）または Docker（`docker run … taskaror <command>`）から実行します（ネイティブバイナリ化はしません）。web の GUI は `taskaror serve` で配信する静的 SPA として提供し（従来どおり localStorage + ダウンロード/アップロードで、ファイルの直接編集はしません）、spec ファイルを引数に取るサブコマンドとして `validate` / `lint` / `svg` を提供します（`lint` のルールは [docs/lint.md](docs/lint.md) を参照）。ルートの `npm run build` は型チェック → web → cli の順に実行し、cli のビルドで web の `dist` を `packages/cli/dist/web` へコピーします（この順序が前提です）。
-
-## 提供予定のツール群
-
-- TaskSpec JSON Schema / バリデーター / Linter / Formatter
-- CLI
-- WBS・ガントチャートレンダラー
+- Formatter
 - Markdown（Remark）プラグイン
 - VS Code 拡張 / Language Server Protocol (LSP)
 - エクスポート（HTML / Excel / CSV / Mermaid）
