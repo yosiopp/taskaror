@@ -42,7 +42,7 @@ docker run --rm -p 5173:5173 taskaror serve  # CLI イメージで GUI を配信
 
 - **コミット** — 適度な粒度でコミットする。コミットメッセージは簡潔に 1 行で書き、Co-Authored-By などの AI エージェント情報は付けない
 - **セルフレビュー** — 定期的に `/code-review`・`/simplify` 相当のセルフレビュー・リファクタリングを行い、その結果をコミットする
-- **ドキュメント** — `docs/` 配下に必要なドキュメントを整備し、実装と docs を同期させながら更新する
+- **ドキュメント** — `docs/` 配下に必要なドキュメントを整備し、実装と docs を同期させながら更新する。設計方針・決めごとは [docs/decisions.md](docs/decisions.md) に記録する(スケジュール導出は [docs/derivation.md](docs/derivation.md)、lint ルールは [docs/lint.md](docs/lint.md))
 - **テスト** — 必要ならテストコードも書く(コアロジックは原則テストを書く)
 - **タスク完了の条件** — 実装が終わったら動作確認(実際に動かす・テスト実行)をしてから、tasks.md の該当タスクにチェックをつける
 - **バージョン** — リリース時は root・packages/web・packages/cli の package.json の version を揃えて上げる(GUI 表示は web の version、CLI の --version は cli の version を使う)
@@ -62,7 +62,7 @@ TaskSpec は「仕様」、taskaror は「その実装のひとつ」という�
 
 1. [schema/1.0/taskspec.schema.json](schema/1.0/taskspec.schema.json) — TaskSpec 1.0 の JSON Schema(draft 2020-12)。フォーマットの正。`$id` の URL パス(`schema/1.0/taskspec.schema.json`)とディレクトリ構造を一致させており、バージョン追加時は `schema/<version>/` を新設する。Ajv で検証する場合はデフォルトエクスポートではなく `ajv/dist/2020` の `Ajv2020` を使い、`format: "date"` のために ajv-formats を併用する
 2. [packages/core/src/types/taskspec.ts](packages/core/src/types/taskspec.ts) — スキーマと対応する TypeScript 型定義
-3. [packages/core/src/lib/taskspec.ts](packages/core/src/lib/taskspec.ts) — parse / serialize / flatten などのコアロジック(現状は最小限の構造チェックのみで、schema.json による完全バリデーションは未実装)
+3. [packages/core/src/lib/taskspec.ts](packages/core/src/lib/taskspec.ts) — parse / serialize / flatten などのコアロジック(parse 自体は最小限の構造チェックのみ。schema.json による完全検証は [packages/core/src/lib/validate.ts](packages/core/src/lib/validate.ts) が担う)
 
 [packages/web/src/App.tsx](packages/web/src/App.tsx) は [examples/ecommerce.taskspec.yaml](examples/ecommerce.taskspec.yaml) を `?raw` インポートして表示するサンプル UI。
 
