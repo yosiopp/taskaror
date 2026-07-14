@@ -1,0 +1,7 @@
+[
+  { "text": "TaskSpec フォーマット", "link": "/taskspec" },
+  { "text": "GUI", "link": "/gui" },
+  { "text": "CLI", "link": "/cli" },
+  { "text": "スケジュール導出", "link": "/derivation" },
+  { "text": "lint ルール", "link": "/lint" }
+]

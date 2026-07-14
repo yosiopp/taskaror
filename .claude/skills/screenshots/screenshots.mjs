@@ -12,7 +12,7 @@ mkdirSync(outDir, { recursive: true })
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const page = await browser.newPage({
-  // 既存画像とサイズを揃える(docs/site/images は 1440x640・1x)
+  // 既存画像とサイズを揃える(docs/site/docs/images は 1440x640・1x)
   viewport: { width: 1440, height: 640 },
   deviceScaleFactor: 1,
 })

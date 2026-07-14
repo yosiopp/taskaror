@@ -6,7 +6,7 @@ TaskSpec は、人・AI・Git が扱いやすいことを重視した、軽量�
 
 📖 **ドキュメントサイト: <https://yosiopp.github.io/taskaror/>**（TaskSpec の仕様・操作方法・ヘルプ）
 
-![taskaror のガント編集ビュー。左に編集可能なタスクグリッド、右に SVG ガントチャートを表示](docs/site/images/screenshot-gantt.png)
+![taskaror のガント編集ビュー。左に編集可能なタスクグリッド、右に SVG ガントチャートを表示](docs/site/docs/images/screenshot-gantt.png)
 
 ## コンセプト
 
@@ -22,7 +22,7 @@ TaskSpec は、人・AI・Git が扱いやすいことを重視した、軽量�
 ## 主な機能
 
 - **ガントチャートエディタ** — 左は編集可能なタスクグリッド、右は自前の SVG ガント。左右は行が揃い、境界をドラッグしてペイン幅を変更できます
-- **スケジュール自動導出** — 見積工数（`1.5d` / `4h`、1d = 8h）・依存・営業日（土日スキップ）から開始日・終了日を計算します（[導出ルール](https://yosiopp.github.io/taskaror/derivation/)）。導出値は保存しません
+- **スケジュール自動導出** — 見積工数（`1.5d` / `4h`、1d = 8h）・依存・営業日（土日スキップ）から開始日・終了日を計算します（[導出ルール](https://yosiopp.github.io/taskaror/derivation)）。導出値は保存しません
 - **直感的な編集** — インライン編集・ダブルクリックの編集ダイアログ・ドラッグ&ドロップでの階層移動・ガントバーのドラッグでの日程調整・依存線のドラッグ設定
 - **ビュー切り替え** — ガントチャート / YAML テキスト / WBS 番号付きテーブル
 - **YAML の忠実性** — 読み込んだ YAML の未変更部分について、コメント・キー順・引用符スタイルを保持します
@@ -34,11 +34,11 @@ TaskSpec は、人・AI・Git が扱いやすいことを重視した、軽量�
 
 WBS 番号付きテーブルビュー。WBS 番号・開始日・終了日などの導出値を一覧できます。
 
-![WBS 番号付きテーブルビュー。WBS 番号・タスク名・期間を表形式で表示](docs/site/images/screenshot-wbs.png)
+![WBS 番号付きテーブルビュー。WBS 番号・タスク名・期間を表形式で表示](docs/site/docs/images/screenshot-wbs.png)
 
 YAML テキストビュー。YAML を直接編集し「適用」でモデルへ反映できます。
 
-![YAML テキストビュー。TaskSpec の YAML をテキストエリアで直接編集](docs/site/images/screenshot-yaml.png)
+![YAML テキストビュー。TaskSpec の YAML をテキストエリアで直接編集](docs/site/docs/images/screenshot-yaml.png)
 
 ## 使ってみる
 
@@ -56,11 +56,11 @@ docker run --rm -p 5173:5173 ghcr.io/yosiopp/taskaror serve
 
 リポジトリから直接使う場合は、ルートで `npm install && npm run build` した後に `npm exec taskaror -- serve` を実行します。
 
-エディタの操作方法は **[GUI エディタの使い方](https://yosiopp.github.io/taskaror/gui/)** を参照してください。
+エディタの操作方法は **[GUI エディタの使い方](https://yosiopp.github.io/taskaror/gui)** を参照してください。
 
 ## CLI
 
-`taskaror` コマンドは `serve` のほかに、spec ファイルを引数に取るサブコマンドを提供します（詳細は [CLI の使い方](https://yosiopp.github.io/taskaror/cli/)）。
+`taskaror` コマンドは `serve` のほかに、spec ファイルを引数に取るサブコマンドを提供します（詳細は [CLI の使い方](https://yosiopp.github.io/taskaror/cli)）。
 
 ```bash
 npx taskaror --help               # 使い方を表示(各サブコマンドは <command> --help)
@@ -73,17 +73,17 @@ npx taskaror svg task.taskspec.yaml -o gantt.svg    # ファイルへ書き出�
 docker run --rm -v $PWD:/work ghcr.io/yosiopp/taskaror validate task.taskspec.yaml
 ```
 
-`validate` / `lint` は問題を検出すると終了コード 1 を返すため、CI にも組み込めます（[lint ルール](https://yosiopp.github.io/taskaror/lint/)）。
+`validate` / `lint` は問題を検出すると終了コード 1 を返すため、CI にも組み込めます（[lint ルール](https://yosiopp.github.io/taskaror/lint)）。
 
 ## ドキュメント
 
 利用者向けドキュメントは GitHub Pages で公開しています（ソースは [docs/site/](docs/site/)）。
 
-- [TaskSpec フォーマット](https://yosiopp.github.io/taskaror/taskspec/) — YAML フォーマットの仕様（フィールド一覧・拡張性・Non-Goals）
-- [GUI エディタの使い方](https://yosiopp.github.io/taskaror/gui/) — 操作方法・キーボードショートカット
-- [CLI の使い方](https://yosiopp.github.io/taskaror/cli/) — `taskaror` コマンドのリファレンス
-- [スケジュール導出ルール](https://yosiopp.github.io/taskaror/derivation/) — 開始日・終了日・期間の計算規則
-- [lint ルール](https://yosiopp.github.io/taskaror/lint/) — `taskaror lint` のルール仕様
+- [TaskSpec フォーマット](https://yosiopp.github.io/taskaror/taskspec) — YAML フォーマットの仕様（フィールド一覧・拡張性・Non-Goals）
+- [GUI エディタの使い方](https://yosiopp.github.io/taskaror/gui) — 操作方法・キーボードショートカット
+- [CLI の使い方](https://yosiopp.github.io/taskaror/cli) — `taskaror` コマンドのリファレンス
+- [スケジュール導出ルール](https://yosiopp.github.io/taskaror/derivation) — 開始日・終了日・期間の計算規則
+- [lint ルール](https://yosiopp.github.io/taskaror/lint) — `taskaror lint` のルール仕様
 
 開発者向けドキュメントはリポジトリ内にあります。
 

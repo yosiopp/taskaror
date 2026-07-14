@@ -78,19 +78,29 @@ TaskSpec のフォーマットを変更するときは、schema・型定義・�
 ドキュメントは `docs/` 配下に集約し、公開/非公開で置き場所を分ける
 ([decisions.md](decisions.md) の「ドキュメントの公開区分」参照)。
 
-- `docs/site/` — 利用者向け(GitHub Pages で公開)。TaskSpec 仕様・GUI / CLI の操作方法・
-  スケジュール導出([site/derivation.md](site/derivation.md))・
-  lint ルール([site/lint.md](site/lint.md))
+- `docs/site/` — 利用者向け(GitHub Pages で公開)。Rspress 製のドキュメントサイト
+  (`@taskaror/docs` ワークスペース)。コンテンツは `docs/site/docs/` 配下:
+  TaskSpec 仕様・GUI / CLI の操作方法・
+  スケジュール導出([site/docs/derivation.md](site/docs/derivation.md))・
+  lint ルール([site/docs/lint.md](site/docs/lint.md))
 - `docs/` 直下 — 開発者向け(公開しない)。本ファイルと [decisions.md](decisions.md)
 
 公開サイトは https://yosiopp.github.io/taskaror/ 。main への push
-(`docs/site/**` の変更)を契機に .github/workflows/pages.yml が Jekyll でビルドして
-デプロイする。**初回のみ**リポジトリの Settings → Pages → Build and deployment →
-Source を「GitHub Actions」に設定する必要がある。
+(`docs/site/**` の変更)を契機に .github/workflows/pages.yml が Rspress でビルドして
+デプロイする。ローカルでは `npm run docs:dev`(dev server)/ `npm run docs:build`
+(`docs/site/doc_build` に出力)で確認できる。**初回のみ**リポジトリの
+Settings → Pages → Build and deployment → Source を「GitHub Actions」に
+設定する必要がある。
+
+rspress は React 18 前提のため、モノレポのルートに hoist された web 用 React 19 と
+共存できるよう、docs/site 直下に react / react-dom / react-helmet-async を devDependencies
+として持ち、rspress.config.ts の alias で単一のコピーに解決させている。この alias を
+外すと react-helmet-async が二重バンドルされ、全ページの SSG が失敗して CSR
+フォールバック(中身が空の HTML)に劣化するので注意。
 
 ## スクリーンショットの更新
 
-docs/site/images/ のスクリーンショット(ガント / WBS表 / YAML)は、UI 変更後に
+docs/site/docs/images/ のスクリーンショット(ガント / WBS表 / YAML)は、UI 変更後に
 [.claude/skills/screenshots/](../.claude/skills/screenshots/) の手順(SKILL.md)で撮り直す。
 dev サーバを起動し、システムの Chrome(playwright-core)で 3 ビューを操作して撮影する。
 

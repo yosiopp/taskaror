@@ -1,4 +1,4 @@
-# docs/site/(利用者向けドキュメント)を Jekyll でビルドして GitHub Pages に公開する。
+# docs/site/(利用者向けドキュメント)を Rspress でビルドして GitHub Pages に公開する。
 # 初回のみ Settings → Pages → Build and deployment → Source を「GitHub Actions」に設定すること。
 name: GitHub Pages
 
@@ -27,17 +27,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build with Rspress
+        run: npm run docs:build
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./docs/site
-          destination: ./_site
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/site/doc_build
 
   deploy:
     environment:

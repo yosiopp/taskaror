@@ -2,7 +2,7 @@
 
 taskaror の GUI エディタは、左に編集可能なタスクグリッド、右に SVG ガントチャートを表示するガントチャートエディタです。編集内容はリアルタイムにガントへ反映され、`.taskspec.yaml` として保存できます。
 
-![taskaror のガント編集ビュー。左に編集可能なタスクグリッド、右に SVG ガントチャートを表示](images/screenshot-gantt.png)
+![taskaror のガント編集ビュー。左に編集可能なタスクグリッド、右に SVG ガントチャートを表示](./images/screenshot-gantt.png)
 
 ## 起動
 
@@ -52,11 +52,11 @@ Docker などその他の起動方法は [CLI の使い方](cli.md) を参照し
 
 WBS 番号付きテーブルビューでは、WBS 番号・開始日・終了日などの導出値を一覧できます。
 
-![WBS 番号付きテーブルビュー。WBS 番号・タスク名・期間を表形式で表示](images/screenshot-wbs.png)
+![WBS 番号付きテーブルビュー。WBS 番号・タスク名・期間を表形式で表示](./images/screenshot-wbs.png)
 
 YAML テキストビューでは、YAML を直接編集し「適用」でモデルへ反映できます。
 
-![YAML テキストビュー。TaskSpec の YAML をテキストエリアで直接編集](images/screenshot-yaml.png)
+![YAML テキストビュー。TaskSpec の YAML をテキストエリアで直接編集](./images/screenshot-yaml.png)
 
 ## キーボードショートカット
 

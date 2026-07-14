@@ -13,7 +13,7 @@ function lintUsage(): string {
   return [
     '使い方: taskaror lint <ファイル>...',
     '',
-    'spec のスケジュール導出から見た矛盾・怪しい記述を検出する(ルールは https://yosiopp.github.io/taskaror/lint/)。',
+    'spec のスケジュール導出から見た矛盾・怪しい記述を検出する(ルールは https://yosiopp.github.io/taskaror/lint)。',
     '複数ファイルを指定できる。warning があれば終了コード 1、info のみなら 0 を返す。',
     '',
     'オプション:',
@@ -75,6 +75,6 @@ function runLint(argv: string[]): number {
 /** ディスパッチ(cli.ts のレジストリ)に登録するコマンド定義 */
 export const lintCommand: Command = {
   description:
-    'spec の矛盾・怪しい記述を検出する(ルールは https://yosiopp.github.io/taskaror/lint/)',
+    'spec の矛盾・怪しい記述を検出する(ルールは https://yosiopp.github.io/taskaror/lint)',
   run: runLint,
 }

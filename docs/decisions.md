@@ -1,8 +1,8 @@
 # 決定記録
 
 taskaror の実装で採用した決めごとをまとめる。スケジュール導出の規則は
-[site/derivation.md](site/derivation.md)、lint のルール仕様は
-[site/lint.md](site/lint.md) にあり、ここにはそれ以外の決定を記録する。
+[site/docs/derivation.md](site/docs/derivation.md)、lint のルール仕様は
+[site/docs/lint.md](site/docs/lint.md) にあり、ここにはそれ以外の決定を記録する。
 
 ## ドキュメントの公開区分
 
@@ -10,7 +10,9 @@ taskaror の実装で採用した決めごとをまとめる。スケジュー�
 
 - **`docs/site/` — GitHub Pages で公開する利用者向けドキュメント**(TaskSpec の仕様・
   GUI / CLI の操作方法・スケジュール導出・lint ルールなどのヘルプ)。
-  .github/workflows/pages.yml が Jekyll でビルドして公開する
+  Rspress のワークスペース(`@taskaror/docs`)で、コンテンツは `docs/site/docs/` 配下。
+  .github/workflows/pages.yml が Rspress でビルドして公開する
+  (当初は Jekyll。React/npm 構成への統一と SPA 同居のため Rspress に移行した)
 - **`docs/` 直下 — 公開しない開発者向けドキュメント**(開発ルール・設計履歴・開発情報。
   decisions.md と development.md)
 - README は概要とリンク集にとどめ、操作方法・仕様の本文は docs/site/ に置く
@@ -53,4 +55,4 @@ taskaror の実装で採用した決めごとをまとめる。スケジュー�
 
 1d = 8h 固定、土日スキップ、開始日の優先規則、estimate 未指定タスクの
 0d マイルストーン扱い、親タスクの包絡と開始下限の伝播などの決めごとと実装定義は
-[site/derivation.md](site/derivation.md) にまとめている。
+[site/docs/derivation.md](site/docs/derivation.md) にまとめている。

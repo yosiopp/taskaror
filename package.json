@@ -4,11 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "docs/site"
   ],
   "scripts": {
     "dev": "npm run dev -w @taskaror/web",
     "build": "tsc -b && npm run build -w @taskaror/web && npm run build -w taskaror",
+    "docs:dev": "npm run dev -w @taskaror/docs",
+    "docs:build": "npm run build -w @taskaror/docs",
     "preview": "npm run preview -w @taskaror/web",
     "typecheck": "tsc -b",
     "test": "vitest run",
