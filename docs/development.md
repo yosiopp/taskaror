@@ -88,6 +88,12 @@ TaskSpec のフォーマットを変更するときは、schema・型定義・�
 デプロイする。**初回のみ**リポジトリの Settings → Pages → Build and deployment →
 Source を「GitHub Actions」に設定する必要がある。
 
+## スクリーンショットの更新
+
+docs/site/images/ のスクリーンショット(ガント / WBS表 / YAML)は、UI 変更後に
+[.claude/skills/screenshots/](../.claude/skills/screenshots/) の手順(SKILL.md)で撮り直す。
+dev サーバを起動し、システムの Chrome(playwright-core)で 3 ビューを操作して撮影する。
+
 ## 関連ドキュメント
 
 - [decisions.md](decisions.md) — 設計方針・決定記録
