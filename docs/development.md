@@ -86,8 +86,12 @@ TaskSpec のフォーマットを変更するときは、schema・型定義・�
 - `docs/` 直下 — 開発者向け(公開しない)。本ファイルと [decisions.md](decisions.md)
 
 公開サイトは https://yosiopp.github.io/taskaror/ 。main への push
-(`docs/site/**` の変更)を契機に .github/workflows/pages.yml が Rspress でビルドして
-デプロイする。ローカルでは `npm run docs:dev`(dev server)/ `npm run docs:build`
+(`docs/site/**`・`packages/web/**`・`packages/core/**` の変更)を契機に
+.github/workflows/pages.yml が Rspress でビルドしてデプロイする。web(GUI エディタ)も
+同じワークフローでビルドし、同一 Pages サイトの
+[/app/](https://yosiopp.github.io/taskaror/app/) に合流させて配信する
+(Vite の `base: './'` により /app/ 配下でも CLI のルート配信でも動く)。
+ローカルでは `npm run docs:dev`(dev server)/ `npm run docs:build`
 (`docs/site/doc_build` に出力)で確認できる。**初回のみ**リポジトリの
 Settings → Pages → Build and deployment → Source を「GitHub Actions」に
 設定する必要がある。

@@ -1,4 +1,5 @@
 # docs/site/(利用者向けドキュメント)を Rspress でビルドして GitHub Pages に公開する。
+# web(GUI エディタ)も同じ Pages サイトの /app/ に合流させて配信する。
 # 初回のみ Settings → Pages → Build and deployment → Source を「GitHub Actions」に設定すること。
 name: GitHub Pages
 
@@ -7,6 +8,8 @@ on:
     branches: [main]
     paths:
       - 'docs/site/**'
+      - 'packages/web/**'
+      - 'packages/core/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -38,6 +41,12 @@ jobs:
 
       - name: Build with Rspress
         run: npm run docs:build
+
+      - name: Build web (GUI エディタ)
+        run: npm run build -w @taskaror/web
+
+      - name: Merge web into Pages site (/app/)
+        run: cp -R packages/web/dist docs/site/doc_build/app
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

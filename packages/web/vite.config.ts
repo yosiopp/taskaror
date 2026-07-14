@@ -13,6 +13,9 @@ const pkg = JSON.parse(
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages の /app/ 配下でも CLI(taskaror serve)のルート配信でも動くよう、
+  // アセット参照を相対パスにする
+  base: './',
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),

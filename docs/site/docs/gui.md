@@ -10,7 +10,7 @@ taskaror の GUI エディタは、左に編集可能なタスクグリッド、
 npx taskaror serve    # http://127.0.0.1:5173 で配信(要 Node.js 20+)
 ```
 
-Docker などその他の起動方法は [CLI の使い方](cli.md) を参照してください。
+Docker などその他の起動方法は [CLI の使い方](cli.md) を参照してください。インストールせずに試す場合は [ブラウザ版](https://yosiopp.github.io/taskaror/app/) をそのまま開けます(編集内容はブラウザの localStorage に保存されます)。
 
 ## ファイルの作成・読み込み・保存
 

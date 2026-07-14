@@ -6,6 +6,9 @@ hero:
   tagline: YAML ベースのタスク定義フォーマット TaskSpec を編集・検証・可視化するオープンソースプロジェクト
   actions:
     - theme: brand
+      text: ブラウザで試す
+      link: https://yosiopp.github.io/taskaror/app/
+    - theme: alt
       text: はじめる
       link: /gui
     - theme: alt

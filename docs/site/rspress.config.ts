@@ -15,6 +15,8 @@ export default defineConfig({
   root: 'docs',
   base: '/taskaror/',
   title: 'taskaror',
+  // web(GUI エディタ)と同じファビコン(docs/public/favicon.svg)
+  icon: '/favicon.svg',
   description:
     'YAML ベースのタスク定義フォーマット TaskSpec のエディタ・ツール群',
   route: {
