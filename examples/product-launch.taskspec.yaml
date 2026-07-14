@@ -1,0 +1,108 @@
+# フォーマットの表現力を示すサンプル(新サービス立ち上げ)。
+# - 深いネスト: tasks の入れ子で 4 階層の WBS を表現する
+# - マイルストーン: estimate のない子なしタスクは 0d のマイルストーンとして扱われる
+# - 独自拡張: x- プレフィックスで組織固有の情報(チケット番号・リスクなど)を追加できる
+taskspec: '1.0'
+
+info:
+  title: 新サービス立ち上げ
+
+tasks:
+  - id: phase1
+    title: フェーズ1 価値検証
+    x-goal: 1 か月でプロトタイプの検証まで完了する
+    tasks:
+      - id: research
+        title: 市場調査
+        tasks:
+          - id: interview
+            title: ユーザーインタビュー
+            start: '2026-08-03'
+            estimate: 3d
+            assignees: [yamada]
+            tags: [調査]
+            x-ticket: SRV-101
+          - id: analysis
+            title: インタビュー結果の分析
+            estimate: 2d
+            assignees: [yamada]
+            tags: [調査]
+            depends: [interview]
+            x-ticket: SRV-102
+      - id: prototype
+        title: プロトタイプ
+        depends: [research]
+        tasks:
+          - id: proto-design
+            title: 画面モック作成
+            estimate: 2d
+            assignees: [kimura]
+          - id: proto-test
+            title: ユーザビリティテスト
+            estimate: 1d
+            assignees: [kimura, yamada]
+            depends: [proto-design]
+            x-risk: 被験者が集まらない場合は社内メンバーで代替する
+      - id: go-nogo
+        title: Go/No-Go 判定
+        depends: [prototype]
+        tags: [マイルストーン]
+        note: estimate のない子なしタスクは 0d のマイルストーンとして扱われる
+
+  - id: phase2
+    title: フェーズ2 開発
+    depends: [go-nogo]
+    tasks:
+      - id: backend
+        title: バックエンド
+        tasks:
+          - id: auth
+            title: 認証機能
+            tasks:
+              - id: auth-design
+                title: 認証方式の設計
+                estimate: 1d
+                assignees: [kimura]
+                x-ticket: SRV-201
+              - id: auth-impl
+                title: 実装・テスト
+                estimate: 3d
+                assignees: [kimura]
+                depends: [auth-design]
+                x-ticket: SRV-202
+          - id: billing
+            title: 課金機能
+            tasks:
+              - id: billing-design
+                title: 料金プラン・決済フローの設計
+                estimate: 1d
+                assignees: [mori]
+              - id: billing-impl
+                title: 決済 API 連携
+                estimate: 4d
+                assignees: [mori]
+                depends: [billing-design]
+                x-risk: 決済代行会社の審査に時間がかかる可能性がある
+      - id: frontend
+        title: フロントエンド
+        tasks:
+          - id: ui-kit
+            title: UI コンポーネント整備
+            estimate: 2d
+            assignees: [hayashi]
+          - id: screens
+            title: 画面実装
+            estimate: 5d
+            assignees: [hayashi]
+            depends: [ui-kit]
+      - id: qa
+        title: 総合テスト
+        estimate: 3d
+        assignees: [yamada]
+        depends: [backend, frontend]
+
+  - id: release
+    title: 正式リリース
+    depends: [phase2]
+    tags: [マイルストーン]
+    x-announce: プレスリリースと同日に公開する

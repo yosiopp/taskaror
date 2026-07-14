@@ -1,0 +1,24 @@
+# 最小構成のサンプル。
+# 必須はトップレベルの taskspec・tasks と、各タスクの id・title のみ。
+# 開始日・終了日・WBS 番号などの導出値は YAML に書かず、レンダラーが計算する。
+taskspec: '1.0'
+
+info:
+  title: はじめての TaskSpec
+
+tasks:
+  - id: plan
+    title: 計画を立てる
+    estimate: 1d
+
+  - id: work
+    title: 作業する
+    estimate: 3d
+    depends:
+      - plan # plan の完了後に開始する
+
+  - id: review
+    title: ふりかえり
+    estimate: 2h
+    depends:
+      - work

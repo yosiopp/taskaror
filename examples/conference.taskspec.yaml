@@ -1,0 +1,96 @@
+# ソフトウェア開発以外の題材(社内カンファレンスの開催準備)のサンプル。
+# 担当者(assignees)・依存(depends)・進捗(progress)・タグ(tags)・メモ(note)を活用する。
+taskspec: '1.0'
+
+info:
+  title: 社内カンファレンス開催準備
+
+tasks:
+  - id: planning
+    title: 企画
+    tasks:
+      - id: concept
+        title: テーマ・コンセプト決定
+        start: '2026-07-01'
+        estimate: 2d
+        assignees: [sato]
+        progress: 100
+        tags: [企画]
+      - id: budget
+        title: 予算申請
+        estimate: 1d
+        assignees: [sato]
+        progress: 100
+        tags: [企画]
+        depends: [concept]
+
+  - id: venue
+    title: 会場手配
+    depends: [planning]
+    tasks:
+      - id: venue-research
+        title: 会場候補の調査
+        estimate: 2d
+        assignees: [suzuki]
+        progress: 100
+        tags: [会場]
+      - id: venue-book
+        title: 会場予約・契約
+        estimate: 1d
+        assignees: [suzuki]
+        progress: 60
+        tags: [会場]
+        depends: [venue-research]
+        note: |
+          キャンセルポリシーを確認すること。
+
+          - 30 日前まで: 無料
+          - それ以降: 会場費の 50%
+
+  - id: speakers
+    title: 登壇者調整
+    depends: [planning]
+    tasks:
+      - id: cfp
+        title: 発表募集(CFP)
+        estimate: 3d
+        assignees: [takahashi]
+        progress: 80
+        tags: [プログラム]
+      - id: selection
+        title: 発表の選考・プログラム確定
+        estimate: 2d
+        assignees: [takahashi, sato]
+        tags: [プログラム]
+        depends: [cfp]
+
+  - id: promotion
+    title: 集客・告知
+    depends: [selection]
+    tasks:
+      - id: announce
+        title: 告知ページ公開
+        estimate: 1d
+        assignees: [suzuki]
+        tags: [広報]
+      - id: registration
+        title: 参加登録の受付・リマインド
+        estimate: 2d
+        assignees: [suzuki]
+        tags: [広報]
+        depends: [announce]
+
+  - id: event-day
+    title: 開催当日
+    depends: [venue, promotion]
+    tasks:
+      - id: rehearsal
+        title: リハーサル
+        estimate: 4h
+        assignees: [sato, suzuki, takahashi]
+      - id: onsite
+        title: 当日運営
+        estimate: 1d
+        assignees: [sato, suzuki, takahashi]
+        depends: [rehearsal]
+        note: 受付開始は開演 30 分前。撤収まで含む。
