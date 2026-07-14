@@ -3,8 +3,8 @@
 `taskaror lint` は、schema・構造としては valid な TaskSpec に対して、
 スケジュール導出の意味論([derivation.md](derivation.md))から見て怪しい・矛盾している記述を
 検出する助言ツール。検出ロジックは
-[packages/core/src/lib/lint.ts](../packages/core/src/lib/lint.ts)(React 非依存の純ロジック)、
-CLI は [packages/cli/src/commands/lint.ts](../packages/cli/src/commands/lint.ts) にある。
+[packages/core/src/lib/lint.ts](https://github.com/yosiopp/taskaror/blob/main/packages/core/src/lib/lint.ts)(React 非依存の純ロジック)、
+CLI は [packages/cli/src/commands/lint.ts](https://github.com/yosiopp/taskaror/blob/main/packages/cli/src/commands/lint.ts) にある。
 
 ## validate との役割分担
 

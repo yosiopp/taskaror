@@ -1,7 +1,7 @@
 /**
  * lint(助言・矛盾検出)ロジック。schema・構造としては valid な TaskSpec を対象に、
- * スケジュール導出の意味論(docs/derivation.md)から見て矛盾している・怪しい記述を検出する。
- * ルールの仕様は docs/lint.md にまとめている(実装と同期させること)。
+ * スケジュール導出の意味論(site/derivation.md)から見て矛盾している・怪しい記述を検出する。
+ * ルールの仕様は site/lint.md にまとめている(実装と同期させること)。
  *
  * 前提: validateTaskSpec を通過した spec を渡すこと。
  * 構造が壊れた spec(依存の循環など)では検出結果を保証しない。
@@ -22,7 +22,7 @@ export type LintSeverity = 'warning' | 'info'
 
 /** lint で見つかった 1 件の指摘 */
 export interface LintIssue {
-  /** ルール ID(docs/lint.md 参照) */
+  /** ルール ID(site/lint.md 参照) */
   rule: string
   severity: LintSeverity
   /** YAML ドキュメント上の位置(例: tasks[0].tasks[1]) */
@@ -184,7 +184,7 @@ function checkCompletedBeforePredecessor(
 
 /**
  * タスク自身または子孫のうち、progress が明示されていて 100 未満の最初のタスク。
- * progress 未指定は「進捗不明」として扱い、未完了とはみなさない(docs/lint.md)
+ * progress 未指定は「進捗不明」として扱い、未完了とはみなさない(site/lint.md)
  */
 function findUnfinished(task: Task): Task | undefined {
   if (task.progress !== undefined && task.progress < 100) return task

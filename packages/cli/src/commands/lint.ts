@@ -1,5 +1,5 @@
 // lint コマンド: spec ファイルからスケジュール導出の意味論上の矛盾・怪しい記述を検出する。
-// ルールの仕様は docs/lint.md、検出本体は @taskaror/core/lint(lintTaskSpec)。
+// ルールの仕様は site/lint.md、検出本体は @taskaror/core/lint(lintTaskSpec)。
 // lint は valid な spec が前提のため、先に validateTaskSpec で検証し、
 // エラーがあれば lint せずに validate を促す。
 import { lintTaskSpec } from '@taskaror/core/lint'
@@ -13,7 +13,7 @@ function lintUsage(): string {
   return [
     '使い方: taskaror lint <ファイル>...',
     '',
-    'spec のスケジュール導出から見た矛盾・怪しい記述を検出する(ルールは docs/lint.md)。',
+    'spec のスケジュール導出から見た矛盾・怪しい記述を検出する(ルールは https://yosiopp.github.io/taskaror/lint/)。',
     '複数ファイルを指定できる。warning があれば終了コード 1、info のみなら 0 を返す。',
     '',
     'オプション:',
@@ -24,7 +24,7 @@ function lintUsage(): string {
 /**
  * 1 ファイルを読み込んで lint し、指摘を表示する。
  * 指摘は「[重大度] パス (id): ルール ID: メッセージ」の形式で 1 件 1 行、
- * 先頭にサマリ行を出す。指摘がなければ OK 1 行(docs/lint.md「CLI の挙動」)。
+ * 先頭にサマリ行を出す。指摘がなければ OK 1 行(site/lint.md「CLI の挙動」)。
  */
 function lintFile(file: string): FileOutcome {
   // 構造が壊れた spec(循環など)に lint すると誤動作するため、先に validate 相当を通す
@@ -74,6 +74,7 @@ function runLint(argv: string[]): number {
 
 /** ディスパッチ(cli.ts のレジストリ)に登録するコマンド定義 */
 export const lintCommand: Command = {
-  description: 'spec の矛盾・怪しい記述を検出する(ルールは docs/lint.md)',
+  description:
+    'spec の矛盾・怪しい記述を検出する(ルールは https://yosiopp.github.io/taskaror/lint/)',
   run: runLint,
 }
