@@ -8,7 +8,7 @@
 
 ---
 
-- [ ] Docker イメージを GHCR (GitHub Container Registry) に登録する GitHub Actions を追加する
+- [x] Docker イメージを GHCR (GitHub Container Registry) に登録する GitHub Actions を追加する
 - [ ] タスク編集ダイアログでタスク ID も編集可能にする（ID を変更した場合、保存時に該当 ID を参照している箇所も一括置換する）
 - [ ] ［ヘルプ］メニューに［使い方］を追加する（GitHub Pages へのリンク）
 - [ ] examples を拡充する

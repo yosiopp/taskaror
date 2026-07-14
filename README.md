@@ -49,9 +49,9 @@ GUI エディタは `taskaror serve` で起動します（npx 実行には Node.
 npx taskaror serve                # http://127.0.0.1:5173 で GUI エディタを配信
 npx taskaror serve --port 8080    # ポートを変更(--host で bind 先も変更可)
 
-# Docker 経由(taskaror が entrypoint のイメージ)
-docker build --target cli -t taskaror .
-docker run --rm -p 5173:5173 taskaror serve
+# Docker 経由(GHCR で公開している、taskaror が entrypoint のイメージ)
+docker pull ghcr.io/yosiopp/taskaror
+docker run --rm -p 5173:5173 ghcr.io/yosiopp/taskaror serve
 ```
 
 リポジトリから直接使う場合は、ルートで `npm install && npm run build` した後に `npm exec taskaror -- serve` を実行します。
@@ -70,7 +70,7 @@ npx taskaror svg task.taskspec.yaml                 # ガントチャート SVG 
 npx taskaror svg task.taskspec.yaml -o gantt.svg    # ファイルへ書き出し(--output でも可)
 
 # Docker では、カレントディレクトリを /work にマウントして渡す
-docker run --rm -v $PWD:/work taskaror validate task.taskspec.yaml
+docker run --rm -v $PWD:/work ghcr.io/yosiopp/taskaror validate task.taskspec.yaml
 ```
 
 `validate` / `lint` は問題を検出すると終了コード 1 を返すため、CI にも組み込めます（[lint ルール](https://yosiopp.github.io/taskaror/lint/)）。

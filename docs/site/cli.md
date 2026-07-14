@@ -55,17 +55,27 @@ GUI と同じレイアウト計算でガントチャートを SVG として出�
 
 ## Docker での実行
 
-`taskaror` を entrypoint にしたイメージを使います。
+`taskaror` を entrypoint にしたイメージを使います。GHCR (GitHub Container Registry) で公開しているイメージ(linux/amd64・linux/arm64 対応)をそのまま pull できます。
+
+```bash
+docker pull ghcr.io/yosiopp/taskaror    # 最新リリース(:1.2.3 のようにバージョン指定も可)
+```
+
+自分でビルドする場合は次のとおりです(以降の実行例では `ghcr.io/yosiopp/taskaror` を `taskaror` に読み替えてください)。
 
 ```bash
 docker build --target cli -t taskaror https://github.com/yosiopp/taskaror.git
 # あるいはリポジトリのクローン内で: docker build --target cli -t taskaror .
+```
 
-docker run --rm taskaror --help
-docker run --rm -p 5173:5173 taskaror serve
+実行例:
+
+```bash
+docker run --rm ghcr.io/yosiopp/taskaror --help
+docker run --rm -p 5173:5173 ghcr.io/yosiopp/taskaror serve
 
 # ファイルを引数に取るコマンドは、カレントディレクトリを /work にマウントして渡す
-docker run --rm -v $PWD:/work taskaror validate task.taskspec.yaml
-docker run --rm -v $PWD:/work taskaror lint task.taskspec.yaml
-docker run --rm -v $PWD:/work taskaror svg task.taskspec.yaml -o gantt.svg
+docker run --rm -v $PWD:/work ghcr.io/yosiopp/taskaror validate task.taskspec.yaml
+docker run --rm -v $PWD:/work ghcr.io/yosiopp/taskaror lint task.taskspec.yaml
+docker run --rm -v $PWD:/work ghcr.io/yosiopp/taskaror svg task.taskspec.yaml -o gantt.svg
 ```
