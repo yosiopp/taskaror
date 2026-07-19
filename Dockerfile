@@ -30,6 +30,10 @@ ENV TASKAROR_SERVE_HOST=0.0.0.0
 # ファイル引数を取るコマンド(validate / svg など)用の作業ディレクトリ。
 # 例: docker run --rm -v $PWD:/work taskaror validate task.taskspec.yaml
 WORKDIR /work
+# root で実行しない(node はベースイメージ同梱の非特権ユーザー)。
+# WORKDIR が作る /work は root 所有のため、非マウント時も書けるよう所有者を移す
+RUN chown node:node /work
+USER node
 EXPOSE 5173
 ENTRYPOINT ["taskaror"]
 CMD ["--help"]

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# このワークフローはリポジトリへ書き込まないため GITHUB_TOKEN を読み取り専用にする
+permissions:
+  contents: read
+
 # 同一ブランチで新しい push があれば実行中のものはキャンセルする
 concurrency:
   group: ci-${{ github.ref }}
