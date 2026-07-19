@@ -59,7 +59,20 @@ describe('validateSchema', () => {
     })
     expect(issues).toContainEqual({
       path: 'tasks[0].estimate',
-      message: '見積工数の形式が正しくありません(例: "1.5d", "4h")',
+      message:
+        '見積工数の形式が正しくありません(整数部 4 桁までの数値 + h/d。例: "1.5d", "4h")',
+    })
+  })
+
+  it('estimate の整数部が 5 桁以上ならスキーマ違反として弾く', () => {
+    const issues = validateSchema({
+      taskspec: '1.0',
+      tasks: [{ id: 'a', title: 'A', estimate: '999999999999d' }],
+    })
+    expect(issues).toContainEqual({
+      path: 'tasks[0].estimate',
+      message:
+        '見積工数の形式が正しくありません(整数部 4 桁までの数値 + h/d。例: "1.5d", "4h")',
     })
   })
 

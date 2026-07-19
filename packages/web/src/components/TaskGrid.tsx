@@ -8,6 +8,7 @@ import type { ChangeEvent, DragEvent, KeyboardEvent, ReactElement } from 'react'
 import type { GanttRow } from '@taskaror/core/gantt'
 import { collectAncestors } from '@taskaror/core/editor'
 import type { DropPosition, TaskFields } from '@taskaror/core/editor'
+import { ESTIMATE_RE } from '@taskaror/core/estimate'
 import type { FlatTask } from '@taskaror/core/taskspec'
 import type { Task } from '@taskaror/core/types/taskspec'
 import { GRID_COLUMNS, HEADER_HEIGHT, ROW_HEIGHT } from './constants'
@@ -22,9 +23,6 @@ const EDITABLE_FIELDS: EditableField[] = [
   'assignees',
   'progress',
 ]
-
-/** estimate の妥当な入力形式(空、または数値+h/d) */
-const ESTIMATE_RE = /^\d+(\.\d+)?(h|d)$/
 
 interface EditingCell {
   id: string

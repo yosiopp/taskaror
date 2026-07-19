@@ -15,9 +15,7 @@ import {
   collectIds,
   validateTaskIdChange,
 } from '@taskaror/core/editor'
-
-/** estimate の妥当な入力形式(空、または数値+h/d)。TaskGrid と同一 */
-const ESTIMATE_RE = /^\d+(\.\d+)?(h|d)$/
+import { ESTIMATE_RE } from '@taskaror/core/estimate'
 
 export interface TaskDialogProps {
   /** 編集対象のタスク(サブツリーを含む spec 上の実体) */

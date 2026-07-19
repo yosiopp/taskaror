@@ -128,7 +128,7 @@ function describeSchemaError(error: ErrorObject): ValidationIssue {
 function patternMessage(instancePath: string): string {
   const field = instancePath.split('/').pop()
   if (field === 'estimate') {
-    return '見積工数の形式が正しくありません(例: "1.5d", "4h")'
+    return '見積工数の形式が正しくありません(整数部 4 桁までの数値 + h/d。例: "1.5d", "4h")'
   }
   if (field === 'id') {
     return 'id は英字で始まり、以降は英数字・ドット・ハイフン・アンダースコアのみ使用できます'

@@ -18,6 +18,12 @@ describe('parseEstimateHours', () => {
     expect(() => parseEstimateHours('1')).toThrow()
     expect(() => parseEstimateHours('d')).toThrow()
   })
+
+  it('整数部は 4 桁まで(巨大値によるスケジュール計算のハング防止)', () => {
+    expect(parseEstimateHours('9999d')).toBe(9999 * 8)
+    expect(() => parseEstimateHours('10000d')).toThrow()
+    expect(() => parseEstimateHours('999999999999d')).toThrow()
+  })
 })
 
 describe('estimateToBusinessDays', () => {

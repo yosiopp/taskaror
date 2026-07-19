@@ -72,8 +72,8 @@
 
         "estimate": {
           "type": "string",
-          "pattern": "^[0-9]+(\\.[0-9]+)?(h|d)$",
-          "description": "Estimated effort. Represents effort, not elapsed duration. Conversion between days and hours is implementation-defined."
+          "pattern": "^[0-9]{1,4}(\\.[0-9]+)?(h|d)$",
+          "description": "Estimated effort. Represents effort, not elapsed duration. The integer part is limited to 4 digits. Conversion between days and hours is implementation-defined."
         },
 
         "start": {
