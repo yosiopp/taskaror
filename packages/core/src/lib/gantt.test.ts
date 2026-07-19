@@ -224,6 +224,33 @@ describe('computeGanttLayout: 期間と軸', () => {
       { label: '2026-08', x: 20, width: 10 },
     ])
   })
+
+  it('期間が上限(MAX_GANTT_DAYS)を超えると例外を投げる(巨大 days 配列によるフリーズ防止)', () => {
+    const rows = flattenScheduled([
+      scheduled({ task: { id: 'a', title: 'A' } }),
+      scheduled({
+        task: { id: 'b', title: 'B' },
+        start: '9999-12-31',
+        end: '9999-12-31',
+      }),
+    ])
+    expect(() => computeGanttLayout(rows, { today: TODAY })).toThrow(
+      /期間が長すぎる/,
+    )
+  })
+
+  it('期間が上限以内なら例外を投げない', () => {
+    const rows = flattenScheduled([
+      scheduled({ task: { id: 'a', title: 'A' } }),
+      scheduled({
+        task: { id: 'b', title: 'B' },
+        start: '2036-07-13',
+        end: '2036-07-13',
+      }),
+    ])
+    // 2026-07-13 〜 2036-07-13 は約 3,653 日で上限(5,000 日)以内
+    expect(() => computeGanttLayout(rows, { today: TODAY })).not.toThrow()
+  })
 })
 
 describe('computeGanttLayout: バー / マイルストーン', () => {

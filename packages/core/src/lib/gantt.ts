@@ -30,6 +30,13 @@ export const DEFAULT_DAY_WIDTH = 28
 /** 1 行あたりの px 高の既定値 */
 export const DEFAULT_ROW_HEIGHT = 34
 
+/**
+ * レイアウト計算できる期間の上限(暦日数、約 13 年)。
+ * days は期間の全暦日を列挙するため、極端な日付(例: 9999-12-31)を含む
+ * spec で配列と SVG が際限なく巨大化しフリーズするのを防ぐ。
+ */
+export const MAX_GANTT_DAYS = 5000
+
 /** 表示行モデル。左グリッドと右ガントで共有し、行を揃えるための平坦化単位 */
 export interface GanttRow {
   scheduled: ScheduledTask
@@ -230,6 +237,13 @@ export function computeGanttLayout(
   }
   const rangeStartDate = addDays(minStart, -paddingDays)
   const rangeEndDate = addDays(maxEnd, paddingDays)
+
+  const totalDays = calendarDaysBetween(rangeStartDate, rangeEndDate) + 1
+  if (totalDays > MAX_GANTT_DAYS) {
+    throw new Error(
+      `ガントの期間が長すぎるため表示できません(${formatDate(rangeStartDate)} 〜 ${formatDate(rangeEndDate)} の ${totalDays} 日。上限 ${MAX_GANTT_DAYS} 日)。タスクの日付を確認してください`,
+    )
+  }
 
   // 暦日インデックス(0 始まり)。X = dayIndex * dayWidth
   const dayIndexOf = (date: string): number =>
