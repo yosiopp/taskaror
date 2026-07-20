@@ -4,8 +4,11 @@ import {
   computeDayWindow,
   computeGanttLayout,
   estimateFromRange,
+  EMPTY_GANTT_FILTER,
   filterCompleted,
+  filterScheduled,
   flattenScheduled,
+  isGanttFilterActive,
   nextSelectionAfterRemoval,
   pxToDayDelta,
   shiftDateByBusinessDays,
@@ -129,6 +132,104 @@ describe('filterCompleted', () => {
     const kept = filterCompleted(roots)
     expect(kept.map((n) => n.task.id)).toEqual(['p'])
     expect(kept[0].children.map((n) => n.task.id)).toEqual(['c2'])
+  })
+})
+
+describe('filterScheduled', () => {
+  /** 担当者・タグ・進捗が混在するツリー(親 p の子に c1 / c2、ルートに q) */
+  const roots = (): ScheduledTask[] =>
+    scheduleTasks(
+      spec([
+        {
+          id: 'p',
+          title: 'P',
+          tasks: [
+            {
+              id: 'c1',
+              title: 'C1',
+              estimate: '1d',
+              assignees: ['tanaka'],
+              tags: ['backend'],
+            },
+            {
+              id: 'c2',
+              title: 'C2',
+              estimate: '1d',
+              assignees: ['suzuki'],
+              tags: ['frontend'],
+              progress: 100,
+            },
+          ],
+        },
+        { id: 'q', title: 'Q', estimate: '1d', assignees: ['suzuki'] },
+      ]),
+      { today: TODAY },
+    )
+
+  const ids = (nodes: ScheduledTask[]): string[] =>
+    flattenScheduled(nodes).map(rowId)
+
+  it('空のフィルタでは何も絞り込まない', () => {
+    const input = roots()
+    expect(filterScheduled(input, EMPTY_GANTT_FILTER)).toBe(input)
+  })
+
+  it('担当者で絞ると一致タスクとその祖先だけが残る', () => {
+    const kept = filterScheduled(roots(), {
+      ...EMPTY_GANTT_FILTER,
+      assignees: ['tanaka'],
+    })
+    expect(ids(kept)).toEqual(['p', 'c1'])
+  })
+
+  it('複数の担当者を選ぶといずれかを含むタスクに絞られる', () => {
+    const kept = filterScheduled(roots(), {
+      ...EMPTY_GANTT_FILTER,
+      assignees: ['tanaka', 'suzuki'],
+    })
+    expect(ids(kept)).toEqual(['p', 'c1', 'c2', 'q'])
+  })
+
+  it('タグで絞ると一致タスクとその祖先だけが残る', () => {
+    const kept = filterScheduled(roots(), {
+      ...EMPTY_GANTT_FILTER,
+      tags: ['frontend'],
+    })
+    expect(ids(kept)).toEqual(['p', 'c2'])
+  })
+
+  it('担当者・タグ・完了非表示は AND で組み合わさる', () => {
+    // suzuki は c2 と q が該当するが、frontend タグで c2 に絞られ、
+    // さらに完了非表示(c2 は progress 100)で空になる
+    const kept = filterScheduled(roots(), {
+      assignees: ['suzuki'],
+      tags: ['frontend'],
+      hideCompleted: true,
+    })
+    expect(ids(kept)).toEqual([])
+  })
+
+  it('完了非表示のみの場合は filterCompleted と同じ結果になる', () => {
+    const kept = filterScheduled(roots(), {
+      ...EMPTY_GANTT_FILTER,
+      hideCompleted: true,
+    })
+    expect(ids(kept)).toEqual(ids(filterCompleted(roots())))
+  })
+})
+
+describe('isGanttFilterActive', () => {
+  it('空のフィルタは無効、いずれかの条件があれば有効', () => {
+    expect(isGanttFilterActive(EMPTY_GANTT_FILTER)).toBe(false)
+    expect(
+      isGanttFilterActive({ ...EMPTY_GANTT_FILTER, assignees: ['a'] }),
+    ).toBe(true)
+    expect(isGanttFilterActive({ ...EMPTY_GANTT_FILTER, tags: ['t'] })).toBe(
+      true,
+    )
+    expect(
+      isGanttFilterActive({ ...EMPTY_GANTT_FILTER, hideCompleted: true }),
+    ).toBe(true)
   })
 })
 

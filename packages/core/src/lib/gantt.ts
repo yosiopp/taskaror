@@ -22,6 +22,7 @@ import {
   type HolidaySet,
 } from './date'
 import type { ScheduledTask } from './schedule'
+import type { Task } from '../types/taskspec'
 
 const MS_PER_DAY = 86_400_000
 
@@ -86,6 +87,84 @@ export function filterCompleted(roots: ScheduledTask[]): ScheduledTask[] {
       node.children.length > 0
         ? { ...node, children: filterCompleted(node.children) }
         : node,
+    )
+  }
+  return result
+}
+
+/**
+ * ガント表示のビューフィルタ(spec は変更しない)。
+ * 各条件は AND で組み合わせる(filterScheduled)。
+ */
+export interface GanttFilter {
+  /** 選択中の担当者。いずれかを含むタスクに絞る(空なら絞り込まない) */
+  assignees: readonly string[]
+  /** 選択中のタグ。いずれかを含むタスクに絞る(空なら絞り込まない) */
+  tags: readonly string[]
+  /** 完了タスク(progress === 100)を隠すか */
+  hideCompleted: boolean
+}
+
+/** 何も絞り込まない空のフィルタ */
+export const EMPTY_GANTT_FILTER: GanttFilter = {
+  assignees: [],
+  tags: [],
+  hideCompleted: false,
+}
+
+/** いずれかの絞り込みが有効か(フィルタアイコンの状態・一括解除の活性に使う) */
+export function isGanttFilterActive(filter: GanttFilter): boolean {
+  return (
+    filter.assignees.length > 0 ||
+    filter.tags.length > 0 ||
+    filter.hideCompleted
+  )
+}
+
+/** values(担当者 / タグ)のいずれかが selected に含まれるか。selected が空なら常に真 */
+function includesAny(
+  values: readonly string[] | undefined,
+  selected: readonly string[],
+): boolean {
+  return (
+    selected.length === 0 || (values ?? []).some((v) => selected.includes(v))
+  )
+}
+
+/**
+ * 述語に一致するタスクと、その祖先だけを残すビューフィルタ。
+ * 祖先は階層の文脈として表示に残す。一致しないタスクは、子孫にも一致がなければ落とす。
+ */
+function filterMatching(
+  roots: ScheduledTask[],
+  matches: (task: Task) => boolean,
+): ScheduledTask[] {
+  const result: ScheduledTask[] = []
+  for (const node of roots) {
+    const children = filterMatching(node.children, matches)
+    if (matches(node.task) || children.length > 0) {
+      result.push({ ...node, children })
+    }
+  }
+  return result
+}
+
+/**
+ * ガント表示のフィルタをまとめて適用する(各条件の AND)。
+ * 担当者・タグは「いずれかを含むタスクとその祖先」を残す。
+ * 完了タスク非表示は filterCompleted と同じく完了ノードごと子孫も落とす。
+ */
+export function filterScheduled(
+  roots: ScheduledTask[],
+  filter: GanttFilter,
+): ScheduledTask[] {
+  let result = filter.hideCompleted ? filterCompleted(roots) : roots
+  if (filter.assignees.length > 0 || filter.tags.length > 0) {
+    result = filterMatching(
+      result,
+      (task) =>
+        includesAny(task.assignees, filter.assignees) &&
+        includesAny(task.tags, filter.tags),
     )
   }
   return result

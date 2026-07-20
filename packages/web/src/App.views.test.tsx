@@ -2,9 +2,10 @@
  * App の UI テスト: ビュー切替と状態の保存・復元。
  * WBS 表への切り替え、ガント編集 ⇔ YAML ビューの同期([適用] の反映と
  * エラー時の非反映)、ビューモード・編集内容の localStorage 永続化、
- * クリティカルパス強調・完了タスク非表示の表示メニュー、[新規] の確認を検証する。
+ * クリティカルパス強調の表示メニュー、[新規] の確認を検証する。
+ * ガント表示のフィルタ([表示] → [フィルター])は App.filter.test.tsx で検証する。
  */
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -153,33 +154,6 @@ describe('App のビュー切替と状態保存', () => {
     expect(
       screen.getByRole('menuitemcheckbox', { name: 'クリティカルパスを強調' }),
     ).toBeChecked()
-  })
-
-  it('完了タスクを非表示にすると progress 100 のタスク行が隠れる', async () => {
-    const user = userEvent.setup()
-    render(<App />)
-
-    // DB設計 の進捗セル(4 番目の編集可能セル)を 100 にする
-    const row = screen.getByText('DB設計').closest('.grid-row') as HTMLElement
-    const cells = row.querySelectorAll('.grid-cell.editable')
-    await user.click(cells[3])
-    const input = screen.getByRole('spinbutton')
-    await user.type(input, '100')
-    fireEvent.blur(input)
-
-    await user.click(screen.getByRole('menuitem', { name: '表示' }))
-    await user.click(
-      screen.getByRole('menuitemcheckbox', { name: '完了タスクを非表示' }),
-    )
-    expect(screen.queryByText('DB設計')).not.toBeInTheDocument()
-    expect(screen.getByText('API設計')).toBeInTheDocument()
-
-    // OFF に戻すと再表示される(spec からは消えていない)
-    await user.click(screen.getByRole('menuitem', { name: '表示' }))
-    await user.click(
-      screen.getByRole('menuitemcheckbox', { name: '完了タスクを非表示' }),
-    )
-    expect(screen.getByText('DB設計')).toBeInTheDocument()
   })
 
   it('[ファイル]→[新規]は確認でキャンセルでき、OK なら空になる', async () => {

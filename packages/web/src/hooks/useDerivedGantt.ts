@@ -3,10 +3,10 @@ import { scheduleTasks } from '@taskaror/core/schedule'
 import type { ScheduledTask } from '@taskaror/core/schedule'
 import {
   computeGanttLayout,
-  filterCompleted,
+  filterScheduled,
   flattenScheduled,
 } from '@taskaror/core/gantt'
-import type { GanttLayout, GanttRow } from '@taskaror/core/gantt'
+import type { GanttFilter, GanttLayout, GanttRow } from '@taskaror/core/gantt'
 import { computeCriticalPath } from '@taskaror/core/critical'
 import { toHolidaySet } from '@taskaror/core/date'
 import type { HolidaySet } from '@taskaror/core/date'
@@ -44,7 +44,7 @@ export function useDerivedGantt(
   spec: TaskSpec,
   collapsedIds: ReadonlySet<string>,
   today: string,
-  hideCompleted: boolean,
+  filter: GanttFilter,
 ): DerivedGantt {
   const computation = useMemo<
     { ok: true; derived: Derived } | { ok: false; error: string }
@@ -52,11 +52,9 @@ export function useDerivedGantt(
     try {
       const holidays = toHolidaySet(spec.info?.holidays)
       const scheduled = scheduleTasks(spec, { today })
-      // 完了タスク非表示は「ガント表示のフィルタ」。scheduled 本体(WBS 表・
-      // クリティカルパス算出に使う)は全タスクのまま保ち、表示行だけを絞る。
-      const displayRoots = hideCompleted
-        ? filterCompleted(scheduled)
-        : scheduled
+      // 担当者・タグ・完了タスク非表示は「ガント表示のフィルタ」。scheduled 本体
+      // (WBS 表・クリティカルパス算出に使う)は全タスクのまま保ち、表示行だけを絞る。
+      const displayRoots = filterScheduled(scheduled, filter)
       const rows = flattenScheduled(displayRoots, collapsedIds)
       const layout = computeGanttLayout(rows, {
         dayWidth: DAY_WIDTH,
@@ -72,7 +70,7 @@ export function useDerivedGantt(
       const message = thrown instanceof Error ? thrown.message : String(thrown)
       return { ok: false, error: message }
     }
-  }, [spec, collapsedIds, today, hideCompleted])
+  }, [spec, collapsedIds, today, filter])
 
   // 直近の正常な派生結果。正常に計算できたらレンダー中に取り込む
   // (収束するので追加のレンダーは 1 回のみ)。

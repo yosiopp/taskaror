@@ -21,6 +21,8 @@ const PATHS = {
   moveUp: 'M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z',
   /** 下へ移動(arrow_downward) */
   moveDown: 'M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z',
+  /** フィルター(filter_list) */
+  filter: 'M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z',
 } as const
 
 export type IconName = keyof typeof PATHS

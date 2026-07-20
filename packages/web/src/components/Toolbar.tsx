@@ -3,12 +3,14 @@
  * 1 行目: アプリ名 / プロジェクトタイトル / メニューバー([ファイル]・[編集]・[表示]・[ヘルプ])。
  * 2 行目: タスク操作のツールバー(Material Icons)。ガント編集ビューでのみ表示する。
  * ファイル・undo/redo・ビュー切替・クリティカルパスなどの操作はメニューに集約し、
- * ツールバーには重複させない。
+ * ツールバーには重複させない。例外はフィルター:適用中かどうかを常に示すため、
+ * ツールバー右端にもアイコンを置く([表示] → [フィルター] と同じダイアログを開く)。
  */
 import { useRef } from 'react'
 import type { ChangeEvent } from 'react'
 import MenuBar from './MenuBar'
 import type { Menu } from './MenuBar'
+import type { FilterSection } from './FilterDialog'
 import { Icon } from './icons'
 import type { IconName } from './icons'
 import { DOCS_URL, REPOSITORY_URL } from '../appInfo'
@@ -33,6 +35,12 @@ export interface ToolbarProps {
   hideCompleted: boolean
   /** 完了タスク非表示の ON/OFF を切り替える */
   onToggleHideCompleted: () => void
+  /** いずれかのフィルタ(担当者・タグ・完了非表示)が有効か */
+  filterActive: boolean
+  /** フィルターダイアログを開く(section はフォーカスする節。省略可) */
+  onOpenFilter: (section?: FilterSection) => void
+  /** すべてのフィルタを解除する */
+  onClearFilter: () => void
   /** ガントを SVG 画像として書き出す */
   onExportSvg: () => void
   /** ガントを PNG 画像として書き出す */
@@ -81,6 +89,9 @@ function Toolbar(props: ToolbarProps) {
     onToggleCriticalPath,
     hideCompleted,
     onToggleHideCompleted,
+    filterActive,
+    onOpenFilter,
+    onClearFilter,
     onExportSvg,
     onExportPng,
     onTitleChange,
@@ -221,10 +232,33 @@ function Toolbar(props: ToolbarProps) {
           onSelect: onToggleCriticalPath,
         },
         {
-          kind: 'checkbox',
-          label: '完了タスクを非表示',
-          checked: hideCompleted,
-          onSelect: onToggleHideCompleted,
+          kind: 'submenu',
+          label: 'フィルター',
+          items: [
+            {
+              kind: 'action',
+              label: '担当者で絞り込む…',
+              onSelect: () => onOpenFilter('assignees'),
+            },
+            {
+              kind: 'action',
+              label: 'タグで絞り込む…',
+              onSelect: () => onOpenFilter('tags'),
+            },
+            {
+              kind: 'checkbox',
+              label: '完了タスクを非表示',
+              checked: hideCompleted,
+              onSelect: onToggleHideCompleted,
+            },
+            { kind: 'separator' },
+            {
+              kind: 'action',
+              label: 'フィルターをすべて解除',
+              onSelect: onClearFilter,
+              disabled: !filterActive,
+            },
+          ],
         },
       ],
     },
@@ -335,6 +369,18 @@ function Toolbar(props: ToolbarProps) {
               <Icon name={tool.icon} />
             </button>
           ))}
+          {/* フィルターは適用中かどうかが常に見えるよう右端に分けて置く */}
+          <span className="tool-spacer" aria-hidden="true" />
+          <button
+            type="button"
+            className={`tool-button${filterActive ? ' filter-active' : ''}`}
+            title={filterActive ? 'フィルター(適用中)' : 'フィルター'}
+            aria-label={filterActive ? 'フィルター(適用中)' : 'フィルター'}
+            aria-haspopup="dialog"
+            onClick={() => onOpenFilter()}
+          >
+            <Icon name="filter" />
+          </button>
         </div>
       ) : null}
     </header>

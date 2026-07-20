@@ -24,18 +24,20 @@ import PaneSeparator from './components/PaneSeparator'
 import YamlView from './components/YamlView'
 import WbsTable from './components/WbsTable'
 import TaskDialog from './components/TaskDialog'
+import FilterDialog from './components/FilterDialog'
+import type { FilterSection } from './components/FilterDialog'
 import AboutDialog from './components/AboutDialog'
 import LoadErrorNotice from './components/LoadError'
 import type { LoadError } from './components/LoadError'
 import { HEADER_HEIGHT, MONTH_BAND_HEIGHT } from './components/constants'
 import { clampGridWidth, maxGridWidth } from './components/paneWidth'
 import {
-  loadHideCompleted,
+  loadGanttFilter,
   loadShowCriticalPath,
   loadStoredGridWidth,
   loadStoredSpec,
   loadViewMode,
-  saveHideCompleted,
+  saveGanttFilter,
   saveShowCriticalPath,
   saveStoredGridWidth,
   saveStoredSpec,
@@ -73,7 +75,11 @@ import {
   taskSpecFileName,
 } from '@taskaror/core/file'
 import { validateTaskSpec } from '@taskaror/core/validate'
-import { nextSelectionAfterRemoval } from '@taskaror/core/gantt'
+import {
+  EMPTY_GANTT_FILTER,
+  isGanttFilterActive,
+  nextSelectionAfterRemoval,
+} from '@taskaror/core/gantt'
 import { renderGanttSvg } from '@taskaror/core/ganttSvg'
 import type { Task, TaskSpec } from '@taskaror/core/types/taskspec'
 
@@ -154,11 +160,15 @@ function App() {
     loadShowCriticalPath,
     saveShowCriticalPath,
   )
-  // 完了タスク(progress === 100)を表示から隠すビューフィルタ(spec は変えない)
-  const [hideCompleted, setHideCompleted] = usePersistentState(
-    loadHideCompleted,
-    saveHideCompleted,
+  // ガント表示のフィルタ(担当者・タグ・完了タスク非表示)。spec は変えない
+  const [filter, setFilter] = usePersistentState(
+    loadGanttFilter,
+    saveGanttFilter,
   )
+  // フィルターダイアログの開閉(section は開いたとき最初にフォーカスする節)
+  const [filterDialog, setFilterDialog] = useState<{
+    section?: FilterSection
+  } | null>(null)
   // 「今日」('YYYY-MM-DD')。今日線・スケジュールの基準日。日付をまたぐと更新される
   const today = useToday()
 
@@ -191,6 +201,16 @@ function App() {
   // 依存編集の選択肢に使う全タスク(深さ付き)
   const allTasks = useMemo(() => flattenTasks(spec.tasks), [spec])
 
+  // フィルターダイアログの選択肢(spec 内の全担当者・全タグ。重複なし)
+  const allAssignees = useMemo(
+    () => [...new Set(allTasks.flatMap((flat) => flat.task.assignees ?? []))],
+    [allTasks],
+  )
+  const allTags = useMemo(
+    () => [...new Set(allTasks.flatMap((flat) => flat.task.tags ?? []))],
+    [allTasks],
+  )
+
   // 編集ダイアログの対象タスク(spec 上の実体)。削除等で消えたら null
   const dialogTask =
     dialogTaskId !== null
@@ -200,7 +220,7 @@ function App() {
   // spec / collapsedIds からスケジュール・ガントレイアウト・クリティカルパスを
   // 派生させる(計算失敗時は直近の正常結果を表示し続け、error にメッセージが入る)
   const { visibleRows, layout, scheduled, criticalIds, holidays, error } =
-    useDerivedGantt(spec, collapsedIds, today, hideCompleted)
+    useDerivedGantt(spec, collapsedIds, today, filter)
 
   // --- ペイン幅(左グリッド)のドラッグリサイズ ---
   // 縦スクロールは 1 つの共有コンテナ(.editor-scroll)に集約したので、
@@ -380,7 +400,8 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (isEditableTarget(event.target)) return
-      if (dialogTaskId !== null || viewMode !== 'gantt') return
+      if (dialogTaskId !== null || filterDialog !== null) return
+      if (viewMode !== 'gantt') return
       const mod = event.ctrlKey || event.metaKey
       if (!mod) {
         if (event.key === 'Insert') {
@@ -427,6 +448,7 @@ function App() {
   }, [
     viewMode,
     dialogTaskId,
+    filterDialog,
     selectedId,
     selectedDependency,
     handleAdd,
@@ -548,8 +570,13 @@ function App() {
         onViewModeChange={setViewMode}
         showCriticalPath={showCriticalPath}
         onToggleCriticalPath={() => setShowCriticalPath((on) => !on)}
-        hideCompleted={hideCompleted}
-        onToggleHideCompleted={() => setHideCompleted((on) => !on)}
+        hideCompleted={filter.hideCompleted}
+        onToggleHideCompleted={() =>
+          setFilter((prev) => ({ ...prev, hideCompleted: !prev.hideCompleted }))
+        }
+        filterActive={isGanttFilterActive(filter)}
+        onOpenFilter={(section) => setFilterDialog({ section })}
+        onClearFilter={() => setFilter(EMPTY_GANTT_FILTER)}
         onExportSvg={handleExportSvg}
         onExportPng={handleExportPng}
         onTitleChange={(title) => dispatch({ type: 'setInfoTitle', title })}
@@ -656,6 +683,17 @@ function App() {
           onSubmit={(changes, newId) =>
             handleDialogSubmit(dialogTask.id, changes, newId)
           }
+        />
+      ) : null}
+
+      {filterDialog !== null ? (
+        <FilterDialog
+          assignees={allAssignees}
+          tags={allTags}
+          filter={filter}
+          onChange={setFilter}
+          onClose={() => setFilterDialog(null)}
+          initialSection={filterDialog.section}
         />
       ) : null}
 

@@ -1,7 +1,7 @@
 /**
  * localStorage への永続化(ブラウザ専用)。
  * 編集内容(YAML テキスト)とビュー設定(ビューモード・グリッド幅・
- * クリティカルパス表示・完了タスク非表示)の読み書きをここに集約する。
+ * クリティカルパス表示・ガントフィルタ)の読み書きをここに集約する。
  * どの関数も localStorage が使えない環境・失敗時には黙ってフォールバックする
  * (容量超過やプライベートモードでの失敗は無視する)。
  */
@@ -12,6 +12,8 @@ import { serializeTaskSpec } from '@taskaror/core/taskspec'
 import { parseTaskSpecDocument } from '@taskaror/core/fidelity'
 import type { Document } from '@taskaror/core/fidelity'
 import { validateTaskSpec } from '@taskaror/core/validate'
+import { EMPTY_GANTT_FILTER } from '@taskaror/core/gantt'
+import type { GanttFilter } from '@taskaror/core/gantt'
 import type { TaskSpec } from '@taskaror/core/types/taskspec'
 
 /** localStorage の保存キー(旧: JSON 形式。後方互換のため読み込みのみ対応) */
@@ -132,15 +134,49 @@ export function saveShowCriticalPath(on: boolean): void {
   writeStorage(CRITICAL_PATH_KEY, on ? '1' : '0')
 }
 
-/** 完了タスク非表示の保存キー */
+/** ガントフィルタの保存キー */
+const GANTT_FILTER_KEY = 'taskaror:ganttFilter'
+/** 完了タスク非表示の旧保存キー(フィルタ導入前。読み込みでの移行のみ対応) */
 const HIDE_COMPLETED_KEY = 'taskaror:hideCompleted'
 
-/** 完了タスク非表示の ON/OFF を復元する(未保存・不正なら OFF) */
-export function loadHideCompleted(): boolean {
-  return readStorage(HIDE_COMPLETED_KEY) === '1'
+/** 文字列配列か(localStorage 由来の値の検証に使う) */
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string')
 }
 
-/** 完了タスク非表示の ON/OFF を保存する */
-export function saveHideCompleted(on: boolean): void {
-  writeStorage(HIDE_COMPLETED_KEY, on ? '1' : '0')
+/** 妥当な GanttFilter か(localStorage 由来の値の検証に使う) */
+function isGanttFilter(value: unknown): value is GanttFilter {
+  if (typeof value !== 'object' || value === null) return false
+  const record = value as Record<string, unknown>
+  return (
+    isStringArray(record.assignees) &&
+    isStringArray(record.tags) &&
+    typeof record.hideCompleted === 'boolean'
+  )
+}
+
+/**
+ * ガントフィルタ(担当者・タグ・完了タスク非表示)を復元する。
+ * 未保存・壊れている場合は旧形式(完了タスク非表示のみ)から移行し、
+ * それもなければ空のフィルタを返す。
+ */
+export function loadGanttFilter(): GanttFilter {
+  const raw = readStorage(GANTT_FILTER_KEY)
+  if (raw !== null) {
+    try {
+      const data: unknown = JSON.parse(raw)
+      if (isGanttFilter(data)) return data
+    } catch {
+      // 壊れていれば旧形式・既定値へフォールバックする
+    }
+  }
+  return {
+    ...EMPTY_GANTT_FILTER,
+    hideCompleted: readStorage(HIDE_COMPLETED_KEY) === '1',
+  }
+}
+
+/** ガントフィルタを localStorage に保存する */
+export function saveGanttFilter(filter: GanttFilter): void {
+  writeStorage(GANTT_FILTER_KEY, JSON.stringify(filter))
 }

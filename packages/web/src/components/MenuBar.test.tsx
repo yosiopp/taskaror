@@ -1,7 +1,8 @@
 /**
  * MenuBar(メニューバー)のコンポーネントテスト。
  * 開閉(クリック・外側クリック・Esc)とキーボード操作(↑/↓/←/→・Enter)、
- * separator・無効項目のスキップ、checkbox / radio の状態表示を検証する。
+ * separator・無効項目のスキップ、checkbox / radio の状態表示、
+ * サブメニュー(submenu)の開閉と項目選択を検証する。
  */
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -14,6 +15,7 @@ function renderMenuBar() {
   const onNew = vi.fn()
   const onOpen = vi.fn()
   const onToggle = vi.fn()
+  const onSubAction = vi.fn()
   const menus: Menu[] = [
     {
       label: 'ファイル',
@@ -29,11 +31,28 @@ function renderMenuBar() {
       items: [
         { kind: 'radio', label: 'ガント', checked: true, onSelect: vi.fn() },
         { kind: 'checkbox', label: '強調', checked: false, onSelect: onToggle },
+        {
+          kind: 'submenu',
+          label: 'フィルター',
+          items: [
+            {
+              kind: 'action',
+              label: '担当者で絞り込む',
+              onSelect: onSubAction,
+            },
+            {
+              kind: 'checkbox',
+              label: '完了を隠す',
+              checked: true,
+              onSelect: vi.fn(),
+            },
+          ],
+        },
       ],
     },
   ]
   render(<MenuBar menus={menus} />)
-  return { onNew, onOpen, onToggle }
+  return { onNew, onOpen, onToggle, onSubAction }
 }
 
 describe('MenuBar', () => {
@@ -121,6 +140,59 @@ describe('MenuBar', () => {
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(trigger).toHaveFocus()
+  })
+
+  it('サブメニューはクリックで開き、項目選択で発火して全体が閉じる', async () => {
+    const user = userEvent.setup()
+    const { onSubAction } = renderMenuBar()
+
+    await user.click(screen.getByRole('menuitem', { name: '表示' }))
+    const parent = screen.getByRole('menuitem', { name: 'フィルター' })
+    expect(parent).toHaveAttribute('aria-haspopup', 'menu')
+    expect(parent).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(parent)
+    expect(parent).toHaveAttribute('aria-expanded', 'true')
+    const subItem = screen.getByRole('menuitem', { name: '担当者で絞り込む' })
+    expect(
+      screen.getByRole('menuitemcheckbox', { name: '完了を隠す' }),
+    ).toBeChecked()
+
+    await user.click(subItem)
+    expect(onSubAction).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('→ キーでサブメニューを開いて最初の項目へ、←/Esc で親項目へ戻る', async () => {
+    const user = userEvent.setup()
+    renderMenuBar()
+
+    screen.getByRole('menuitem', { name: '表示' }).focus()
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{ArrowUp}') // 末尾へ折り返してフィルターへ
+    const parent = screen.getByRole('menuitem', { name: 'フィルター' })
+    expect(parent).toHaveFocus()
+
+    await user.keyboard('{ArrowRight}')
+    expect(
+      screen.getByRole('menuitem', { name: '担当者で絞り込む' }),
+    ).toHaveFocus()
+
+    // ← でサブメニューだけ閉じ、親項目へフォーカスが戻る(メニューは開いたまま)
+    await user.keyboard('{ArrowLeft}')
+    expect(
+      screen.queryByRole('menuitem', { name: '担当者で絞り込む' }),
+    ).not.toBeInTheDocument()
+    expect(parent).toHaveFocus()
+
+    // Esc も同様にサブメニューだけ閉じる
+    await user.keyboard('{ArrowRight}')
+    await user.keyboard('{Escape}')
+    expect(
+      screen.queryByRole('menuitem', { name: '担当者で絞り込む' }),
+    ).not.toBeInTheDocument()
+    expect(parent).toHaveFocus()
+    expect(screen.getByRole('menu')).toBeInTheDocument()
   })
 
   it('checkbox / radio 項目はチェック状態が表示され、選択で発火する', async () => {
