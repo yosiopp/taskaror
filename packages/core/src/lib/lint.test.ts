@@ -363,6 +363,50 @@ describe('lintTaskSpec: weekend-start', () => {
   })
 })
 
+describe('lintTaskSpec: holiday-start', () => {
+  function lintWithHolidays(
+    holidays: string[],
+    tasks: TaskSpec['tasks'],
+  ): LintIssue[] {
+    return lintTaskSpec(
+      { taskspec: '1.0', info: { holidays }, tasks },
+      { today: TODAY },
+    )
+  }
+
+  it('除外日の明示 start を info にする(翌営業日を案内)', () => {
+    const issues = lintWithHolidays(
+      ['2026-07-15'],
+      [{ id: 'a', title: 'A', start: '2026-07-15', estimate: '1d' }],
+    )
+    const found = byRule(issues, 'holiday-start')
+    expect(found).toHaveLength(1)
+    expect(found[0]).toMatchObject({
+      severity: 'info',
+      path: 'tasks[0]',
+      taskId: 'a',
+    })
+    expect(found[0].message).toContain('2026-07-16')
+  })
+
+  it('土日と重なる除外日は weekend-start に委ね holiday-start は出さない', () => {
+    const issues = lintWithHolidays(
+      ['2026-07-18'],
+      [{ id: 'a', title: 'A', start: '2026-07-18', estimate: '1d' }],
+    )
+    expect(byRule(issues, 'holiday-start')).toHaveLength(0)
+    expect(byRule(issues, 'weekend-start')).toHaveLength(1)
+  })
+
+  it('除外日でない明示 start は指摘しない', () => {
+    const issues = lintWithHolidays(
+      ['2026-07-15'],
+      [{ id: 'a', title: 'A', start: '2026-07-13', estimate: '1d' }],
+    )
+    expect(byRule(issues, 'holiday-start')).toHaveLength(0)
+  })
+})
+
 describe('lintTaskSpec: 全体', () => {
   it('矛盾のない spec は指摘なし', () => {
     const issues = lint([

@@ -52,6 +52,35 @@ describe('validateSchema', () => {
     expect(issues).toEqual([])
   })
 
+  it('info.holidays は日付の配列として許可される', () => {
+    const spec: TaskSpec = {
+      taskspec: '1.0',
+      info: { title: 'サンプル', holidays: ['2026-01-01', '2026-05-04'] },
+      tasks: [{ id: 'a', title: 'A' }],
+    }
+    expect(validateSchema(spec)).toEqual([])
+  })
+
+  it('info.holidays の日付形式違反を報告する', () => {
+    const issues = validateSchema({
+      taskspec: '1.0',
+      info: { holidays: ['2026/01/01'] },
+      tasks: [{ id: 'a', title: 'A' }],
+    })
+    expect(issues.length).toBeGreaterThan(0)
+    expect(issues[0].path).toBe('info.holidays[0]')
+  })
+
+  it('info.holidays の重複を報告する', () => {
+    const issues = validateSchema({
+      taskspec: '1.0',
+      info: { holidays: ['2026-01-01', '2026-01-01'] },
+      tasks: [{ id: 'a', title: 'A' }],
+    })
+    expect(issues.length).toBeGreaterThan(0)
+    expect(issues[0].path).toBe('info.holidays')
+  })
+
   it('estimate の形式違反を分かりやすく報告する', () => {
     const issues = validateSchema({
       taskspec: '1.0',

@@ -16,7 +16,14 @@ import {
 } from './schedule'
 import { collectTaskNodes } from './taskspec'
 import type { TaskNode } from './taskspec'
-import { adjustToBusinessDay, formatDate, isWeekend, parseDate } from './date'
+import {
+  adjustToBusinessDay,
+  formatDate,
+  isWeekend,
+  parseDate,
+  toHolidaySet,
+  type HolidaySet,
+} from './date'
 
 export type LintSeverity = 'warning' | 'info'
 
@@ -47,15 +54,17 @@ export function lintTaskSpec(
   const nodes = collectTaskNodes(spec.tasks)
   const nodeById = new Map(nodes.map((node) => [node.task.id, node]))
   const floors = computeStartFloors(spec, options)
+  const holidays = toHolidaySet(spec.info?.holidays)
 
   const issues: LintIssue[] = []
   for (const node of nodes) {
     checkParentEstimate(node, issues)
-    checkStartBeforeParent(node, floors, issues)
-    checkStartBeforeDepends(node, floors, issues)
+    checkStartBeforeParent(node, floors, holidays, issues)
+    checkStartBeforeDepends(node, floors, holidays, issues)
     checkHierarchyDepends(node, nodeById, issues)
     checkCompletedBeforePredecessor(node, nodeById, issues)
-    checkWeekendStart(node, issues)
+    checkWeekendStart(node, holidays, issues)
+    checkHolidayStart(node, holidays, issues)
   }
   return issues
 }
@@ -93,15 +102,16 @@ function checkParentEstimate(node: LintNode, issues: LintIssue[]): void {
 function checkStartBeforeParent(
   node: LintNode,
   floors: Map<Task, TaskStartFloor>,
+  holidays: HolidaySet,
   issues: LintIssue[],
 ): void {
   const { task } = node
   if (task.start === undefined) return
   const floor = floors.get(task)
   if (floor === undefined) return
-  // 比較は調整後 start(土日は翌営業日)で行う。
+  // 比較は調整後 start(土日・除外日は翌営業日)で行う。
   // ルートタスクの下限はプロジェクト最早 start のため、ここに来るのは祖先由来の下限のみ
-  const adjusted = adjustToBusinessDay(parseDate(task.start))
+  const adjusted = adjustToBusinessDay(parseDate(task.start), holidays)
   if (adjusted.getTime() >= parseDate(floor.inherited).getTime()) return
   push(
     issues,
@@ -116,13 +126,14 @@ function checkStartBeforeParent(
 function checkStartBeforeDepends(
   node: LintNode,
   floors: Map<Task, TaskStartFloor>,
+  holidays: HolidaySet,
   issues: LintIssue[],
 ): void {
   const { task } = node
   if (task.start === undefined) return
   const depends = floors.get(task)?.depends
   if (depends === undefined) return
-  const adjusted = adjustToBusinessDay(parseDate(task.start))
+  const adjusted = adjustToBusinessDay(parseDate(task.start), holidays)
   if (adjusted.getTime() >= parseDate(depends.date).getTime()) return
   push(
     issues,
@@ -196,18 +207,42 @@ function findUnfinished(task: Task): Task | undefined {
 }
 
 /** weekend-start: 明示 start が土日(導出では翌営業日にずれる) */
-function checkWeekendStart(node: LintNode, issues: LintIssue[]): void {
+function checkWeekendStart(
+  node: LintNode,
+  holidays: HolidaySet,
+  issues: LintIssue[],
+): void {
   const { task } = node
   if (task.start === undefined) return
   const date = parseDate(task.start)
   if (!isWeekend(date)) return
   const dayName = date.getUTCDay() === 6 ? '土曜日' : '日曜日'
-  const adjusted = formatDate(adjustToBusinessDay(date))
+  const adjusted = formatDate(adjustToBusinessDay(date, holidays))
   push(
     issues,
     node,
     'weekend-start',
     'info',
     `start(${task.start})は${dayName}のため、導出では翌営業日(${adjusted})から開始します`,
+  )
+}
+
+/** holiday-start: 明示 start が除外日(info.holidays。導出では翌営業日にずれる) */
+function checkHolidayStart(
+  node: LintNode,
+  holidays: HolidaySet,
+  issues: LintIssue[],
+): void {
+  const { task } = node
+  if (task.start === undefined || !holidays.has(task.start)) return
+  const date = parseDate(task.start)
+  if (isWeekend(date)) return // 土日と重なる場合は weekend-start に委ねる
+  const adjusted = formatDate(adjustToBusinessDay(date, holidays))
+  push(
+    issues,
+    node,
+    'holiday-start',
+    'info',
+    `start(${task.start})は営業日から除外する日付(info.holidays)のため、導出では翌営業日(${adjusted})から開始します`,
   )
 }

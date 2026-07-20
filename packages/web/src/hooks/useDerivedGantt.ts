@@ -8,6 +8,8 @@ import {
 } from '@taskaror/core/gantt'
 import type { GanttLayout, GanttRow } from '@taskaror/core/gantt'
 import { computeCriticalPath } from '@taskaror/core/critical'
+import { toHolidaySet } from '@taskaror/core/date'
+import type { HolidaySet } from '@taskaror/core/date'
 import type { TaskSpec } from '@taskaror/core/types/taskspec'
 import { DAY_WIDTH, ROW_HEIGHT } from '../components/constants'
 
@@ -16,6 +18,8 @@ interface Derived {
   layout: GanttLayout
   /** スケジュール導出結果のツリー(WBS 表の開始・終了に使う) */
   scheduled: ScheduledTask[]
+  /** 営業日から除外する日付集合(info.holidays)。ガントの操作系にも渡す */
+  holidays: HolidaySet
 }
 
 export interface DerivedGantt extends Derived {
@@ -46,6 +50,7 @@ export function useDerivedGantt(
     { ok: true; derived: Derived } | { ok: false; error: string }
   >(() => {
     try {
+      const holidays = toHolidaySet(spec.info?.holidays)
       const scheduled = scheduleTasks(spec, { today })
       // 完了タスク非表示は「ガント表示のフィルタ」。scheduled 本体(WBS 表・
       // クリティカルパス算出に使う)は全タスクのまま保ち、表示行だけを絞る。
@@ -57,8 +62,12 @@ export function useDerivedGantt(
         dayWidth: DAY_WIDTH,
         rowHeight: ROW_HEIGHT,
         today,
+        holidays,
       })
-      return { ok: true, derived: { visibleRows: rows, layout, scheduled } }
+      return {
+        ok: true,
+        derived: { visibleRows: rows, layout, scheduled, holidays },
+      }
     } catch (thrown) {
       const message = thrown instanceof Error ? thrown.message : String(thrown)
       return { ok: false, error: message }
@@ -71,6 +80,7 @@ export function useDerivedGantt(
     visibleRows: [],
     layout: EMPTY_LAYOUT,
     scheduled: [],
+    holidays: toHolidaySet(),
   })
   if (computation.ok && computation.derived !== lastGood) {
     setLastGood(computation.derived)
@@ -81,8 +91,8 @@ export function useDerivedGantt(
   // クリティカルパスの id 集合。スケジュール導出結果から算出する。
   // scheduled は spec / today が変わると作り直されるので、その参照変化で再計算される。
   const criticalIds = useMemo(
-    () => computeCriticalPath(derived.scheduled),
-    [derived.scheduled],
+    () => computeCriticalPath(derived.scheduled, derived.holidays),
+    [derived.scheduled, derived.holidays],
   )
 
   return {

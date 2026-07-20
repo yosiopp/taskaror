@@ -6,11 +6,13 @@ import {
   businessDayEnd,
   businessDaysBetween,
   formatDate,
+  isNonBusinessDay,
   isWeekend,
   maxDate,
   minDate,
   parseDate,
   shiftBusinessDays,
+  toHolidaySet,
 } from './date'
 
 // 2026-07-13(月)〜 2026-07-20(月)を基準にする
@@ -107,5 +109,55 @@ describe('maxDate / minDate', () => {
     const b = parseDate(FRI)
     expect(formatDate(maxDate(a, b))).toBe(FRI)
     expect(formatDate(minDate(a, b))).toBe(MON)
+  })
+})
+
+describe('除外日(HolidaySet)', () => {
+  // 2026-07-15(水)を除外日にする
+  const HOLIDAYS = toHolidaySet(['2026-07-15'])
+
+  it('toHolidaySet は未指定・空配列で空集合を返す', () => {
+    expect(toHolidaySet().size).toBe(0)
+    expect(toHolidaySet([]).size).toBe(0)
+    expect(toHolidaySet(['2026-07-15']).has('2026-07-15')).toBe(true)
+  })
+
+  it('isNonBusinessDay は土日と除外日を営業日でないと判定する', () => {
+    expect(isNonBusinessDay(parseDate(SAT), HOLIDAYS)).toBe(true)
+    expect(isNonBusinessDay(parseDate('2026-07-15'), HOLIDAYS)).toBe(true)
+    expect(isNonBusinessDay(parseDate(MON), HOLIDAYS)).toBe(false)
+    // 集合を省略すれば土日のみ
+    expect(isNonBusinessDay(parseDate('2026-07-15'))).toBe(false)
+  })
+
+  it('adjustToBusinessDay は除外日を翌営業日にずらす(連続除外日も飛ばす)', () => {
+    expect(
+      formatDate(adjustToBusinessDay(parseDate('2026-07-15'), HOLIDAYS)),
+    ).toBe('2026-07-16')
+    // 金曜を除外すると土日を越えて月曜まで進む
+    const friOff = toHolidaySet([FRI])
+    expect(formatDate(adjustToBusinessDay(parseDate(FRI), friOff))).toBe(
+      NEXT_MON,
+    )
+  })
+
+  it('addBusinessDays / shiftBusinessDays は除外日をカウントしない', () => {
+    // 火(14)+1 営業日 → 水(15)が除外日なので木(16)
+    expect(
+      formatDate(addBusinessDays(parseDate('2026-07-14'), 1, HOLIDAYS)),
+    ).toBe('2026-07-16')
+    expect(
+      formatDate(shiftBusinessDays(parseDate('2026-07-16'), -1, HOLIDAYS)),
+    ).toBe('2026-07-14')
+  })
+
+  it('businessDayEnd / businessDaysBetween は除外日を期間に数えない', () => {
+    // 月(13)から 3 営業日 → 水(15)を飛ばして木(16)終わり
+    expect(formatDate(businessDayEnd(parseDate(MON), 3, HOLIDAYS))).toBe(
+      '2026-07-16',
+    )
+    expect(
+      businessDaysBetween(parseDate(MON), parseDate('2026-07-16'), HOLIDAYS),
+    ).toBe(3)
   })
 })

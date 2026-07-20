@@ -42,6 +42,16 @@
           "type": "string",
           "minLength": 1,
           "description": "Project title."
+        },
+
+        "holidays": {
+          "type": "array",
+          "description": "Dates excluded from business days (e.g. public holidays). Treated like weekends when deriving schedules.",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "format": "date"
+          }
         }
       }
     },

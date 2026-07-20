@@ -277,6 +277,81 @@ describe('computeStartFloors', () => {
   })
 })
 
+describe('scheduleTasks: 除外日(info.holidays)', () => {
+  function specWithHolidays(
+    holidays: string[],
+    tasks: TaskSpec['tasks'],
+  ): TaskSpec {
+    return { taskspec: '1.0', info: { holidays }, tasks }
+  }
+
+  it('除外日始まりの start は翌営業日にずらす', () => {
+    const rows = scheduleTasks(
+      specWithHolidays(
+        ['2026-07-13'],
+        [{ id: 'a', title: 'A', start: '2026-07-13', estimate: '1d' }],
+      ),
+      { today: TODAY },
+    )
+    expect(get(rows, 'a')).toMatchObject({
+      start: '2026-07-14',
+      end: '2026-07-14',
+    })
+  })
+
+  it('期間は除外日を営業日として数えない', () => {
+    // 月(13)始まり 3d。水(15)が除外日なので木(16)終わり
+    const rows = scheduleTasks(
+      specWithHolidays(
+        ['2026-07-15'],
+        [{ id: 'a', title: 'A', start: '2026-07-13', estimate: '3d' }],
+      ),
+      { today: TODAY },
+    )
+    expect(get(rows, 'a')).toMatchObject({
+      start: '2026-07-13',
+      end: '2026-07-16',
+      durationDays: 3,
+    })
+  })
+
+  it('依存の後続開始は除外日を飛ばす', () => {
+    // A が火(14)終わり、水(15)が除外日 → B は木(16)開始
+    const rows = scheduleTasks(
+      specWithHolidays(
+        ['2026-07-15'],
+        [
+          { id: 'a', title: 'A', start: '2026-07-13', estimate: '2d' },
+          { id: 'b', title: 'B', estimate: '1d', depends: ['a'] },
+        ],
+      ),
+      { today: TODAY },
+    )
+    expect(get(rows, 'b')).toMatchObject({
+      start: '2026-07-16',
+      end: '2026-07-16',
+    })
+  })
+
+  it('土日と連続する除外日はまとめて飛ばす', () => {
+    // 金(17)終わりの翌営業日: 土日 + 月(20)が除外日 → 火(21)開始
+    const rows = scheduleTasks(
+      specWithHolidays(
+        ['2026-07-20'],
+        [
+          { id: 'a', title: 'A', start: '2026-07-17', estimate: '1d' },
+          { id: 'b', title: 'B', estimate: '1d', depends: ['a'] },
+        ],
+      ),
+      { today: TODAY },
+    )
+    expect(get(rows, 'b')).toMatchObject({
+      start: '2026-07-21',
+      end: '2026-07-21',
+    })
+  })
+})
+
 describe('scheduleTasks: 異常系', () => {
   it('循環依存でも例外を投げずに結果を返す', () => {
     const rows = scheduleTasks(

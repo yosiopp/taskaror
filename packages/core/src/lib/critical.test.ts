@@ -65,6 +65,24 @@ describe('computeCriticalPath', () => {
     ).toEqual(['m', 'n'])
   })
 
+  it('除外日(info.holidays)を挟む直列チェーンもクリティカルのまま判定する', () => {
+    // A: 月(13)〜火(14)。水(15)は除外日 → B: 木(16)開始。
+    // スケジュールと同じ除外日集合で営業日オーダを取るため gap 1 が保たれる
+    const holidaySpec: TaskSpec = {
+      taskspec: '1.0',
+      info: { holidays: ['2026-07-15'] },
+      tasks: [
+        { id: 'a', title: 'A', start: '2026-07-13', estimate: '2d' },
+        { id: 'b', title: 'B', estimate: '1d', depends: ['a'] },
+      ],
+    }
+    const set = computeCriticalPath(
+      scheduleTasks(holidaySpec, { today: TODAY }),
+      new Set(['2026-07-15']),
+    )
+    expect([...set].sort()).toEqual(['a', 'b'])
+  })
+
   it('サマリーは配下にクリティカルなリーフを含めばクリティカル(depends 先がサマリーでも追従)', () => {
     // design(設計)は api(end 07-14)が終端。impl はサマリー design に依存する。
     expect(

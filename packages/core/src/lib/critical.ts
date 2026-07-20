@@ -21,7 +21,13 @@
  * depends が主にリーフ間で完結する一般的なケースでは期待どおりに動く。
  */
 import type { ScheduledTask } from './schedule'
-import { businessDaysBetween, minDate, parseDate } from './date'
+import {
+  businessDaysBetween,
+  minDate,
+  parseDate,
+  toHolidaySet,
+  type HolidaySet,
+} from './date'
 
 interface LeafNode {
   id: string
@@ -37,8 +43,13 @@ interface LeafNode {
  * ScheduledTask ツリーからクリティカルなタスク id の集合を求める。
  * リーフを対象に slack を計算し、配下にクリティカルなリーフを含むサマリーも集合に含める。
  * タスクが 0 件なら空集合を返す。
+ * holidays はスケジュール導出と同じ除外日集合(info.holidays)を渡す
+ * (営業日オーダの写像を導出と一致させるため)。
  */
-export function computeCriticalPath(scheduled: ScheduledTask[]): Set<string> {
+export function computeCriticalPath(
+  scheduled: ScheduledTask[],
+  holidays: HolidaySet = toHolidaySet(),
+): Set<string> {
   const critical = new Set<string>()
 
   // 全タスクを id 引きできるようにし、リーフを集める(depends 参照の解決に使う)
@@ -60,7 +71,7 @@ export function computeCriticalPath(scheduled: ScheduledTask[]): Set<string> {
   let origin = parseDate(leaves[0].start)
   for (const leaf of leaves) origin = minDate(origin, parseDate(leaf.start))
   const ord = (date: string): number =>
-    businessDaysBetween(origin, parseDate(date))
+    businessDaysBetween(origin, parseDate(date), holidays)
 
   const leafNodes = new Map<string, LeafNode>()
   for (const leaf of leaves) {

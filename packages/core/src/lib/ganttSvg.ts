@@ -15,7 +15,7 @@ export interface GanttSvgColors {
   background: string
   /** 左ラベル列の背景 */
   labelPanel: string
-  /** 週末列のシェード */
+  /** 週末・除外日(info.holidays)列のシェード */
   weekend: string
   /** 行の横罫線 */
   rowLine: string
@@ -147,7 +147,7 @@ export function renderGanttSvg(
   // 時間軸ヘッダ(chart 領域。X をラベル列ぶんずらす)
   parts.push(`<g transform="translate(${labelWidth}, 0)">`)
   for (const day of layout.days) {
-    if (!day.isWeekend) continue
+    if (!day.isWeekend && !day.isHoliday) continue
     parts.push(
       `<rect x="${day.x}" y="${monthBandHeight}" width="${dayWidth}"` +
         ` height="${dayBandHeight}" fill="${colors.weekend}"/>`,
@@ -165,7 +165,7 @@ export function renderGanttSvg(
     )
   }
   for (const day of layout.days) {
-    const opacity = day.isWeekend ? ' opacity="0.6"' : ''
+    const opacity = day.isWeekend || day.isHoliday ? ' opacity="0.6"' : ''
     parts.push(
       `<text x="${day.x + dayWidth / 2}"` +
         ` y="${monthBandHeight + dayBandHeight / 2 + 4}"` +
@@ -182,7 +182,7 @@ export function renderGanttSvg(
   // 本文(chart 領域。X をラベル列ぶん、Y をヘッダぶんずらす)
   parts.push(`<g transform="translate(${labelWidth}, ${headerHeight})">`)
   for (const day of layout.days) {
-    if (!day.isWeekend) continue
+    if (!day.isWeekend && !day.isHoliday) continue
     parts.push(
       `<rect x="${day.x}" y="0" width="${dayWidth}" height="${chartHeight}"` +
         ` fill="${colors.weekend}"/>`,

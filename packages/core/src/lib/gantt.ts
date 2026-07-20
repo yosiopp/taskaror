@@ -18,6 +18,8 @@ import {
   parseDate,
   shiftBusinessDays,
   today,
+  toHolidaySet,
+  type HolidaySet,
 } from './date'
 import type { ScheduledTask } from './schedule'
 
@@ -122,6 +124,8 @@ export interface GanttLayoutOptions {
   today?: Date | string
   /** 期間の前後に足す余白日数(既定 1) */
   paddingDays?: number
+  /** 営業日から除外する日付集合(info.holidays)。日カラムの isHoliday に反映する */
+  holidays?: HolidaySet
 }
 
 export type GanttBarKind = 'task' | 'summary' | 'milestone'
@@ -168,6 +172,8 @@ export interface GanttAxisDay {
   /** この日カラムの左端 X */
   x: number
   isWeekend: boolean
+  /** 営業日から除外する日付(info.holidays)か。描画は土日と同じ表現にする */
+  isHoliday: boolean
 }
 
 export interface GanttAxisMonth {
@@ -211,6 +217,7 @@ export function computeGanttLayout(
   const rowHeight = options.rowHeight ?? DEFAULT_ROW_HEIGHT
   const paddingDays = options.paddingDays ?? 1
   const barHeight = options.barHeight ?? Math.round(rowHeight * 0.5)
+  const holidays = options.holidays ?? toHolidaySet()
 
   if (visibleRows.length === 0) {
     return {
@@ -256,10 +263,12 @@ export function computeGanttLayout(
     cursor.getTime() <= rangeEndDate.getTime();
     cursor = addDays(cursor, 1)
   ) {
+    const date = formatDate(cursor)
     days.push({
-      date: formatDate(cursor),
+      date,
       x: calendarDaysBetween(rangeStartDate, cursor) * dayWidth,
       isWeekend: isWeekend(cursor),
+      isHoliday: holidays.has(date),
     })
   }
 
@@ -456,8 +465,12 @@ export function shiftDateByDays(date: string, deltaDays: number): string {
 }
 
 /** 'YYYY-MM-DD' を営業日で n 日ずらす(キーボード ←/→ での start 変更。n は負も可) */
-export function shiftDateByBusinessDays(date: string, n: number): string {
-  return formatDate(shiftBusinessDays(parseDate(date), n))
+export function shiftDateByBusinessDays(
+  date: string,
+  n: number,
+  holidays?: HolidaySet,
+): string {
+  return formatDate(shiftBusinessDays(parseDate(date), n, holidays))
 }
 
 /**
@@ -465,11 +478,15 @@ export function shiftDateByBusinessDays(date: string, n: number): string {
  * 開始〜終了の営業日数(両端含む)を日数にする。最小 1 営業日。
  * 終了日が開始日より前になった場合は開始日にクランプする。
  */
-export function estimateFromRange(start: string, end: string): string {
+export function estimateFromRange(
+  start: string,
+  end: string,
+  holidays?: HolidaySet,
+): string {
   const startDate = parseDate(start)
   const endDate = parseDate(end)
   const clampedEnd =
     endDate.getTime() < startDate.getTime() ? startDate : endDate
-  const days = Math.max(1, businessDaysBetween(startDate, clampedEnd))
+  const days = Math.max(1, businessDaysBetween(startDate, clampedEnd, holidays))
   return `${days}d`
 }

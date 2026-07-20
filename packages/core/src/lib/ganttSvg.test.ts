@@ -138,6 +138,34 @@ describe('renderGanttSvg: 内容', () => {
     expect(svg).toContain('fill="#eeeeee"')
   })
 
+  it('除外日(isHoliday)の列も週末と同じ色でシェードする', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 't', title: 'X', start: '2026-07-13', estimate: '3d' }]),
+      { today: TODAY },
+    )
+    const rows = flattenScheduled(roots)
+    const build = (holidays?: ReadonlySet<string>): string =>
+      renderGanttSvg(
+        computeGanttLayout(rows, {
+          dayWidth: 10,
+          rowHeight: 20,
+          today: TODAY,
+          paddingDays: 1,
+          holidays,
+        }),
+        labelsOf(rows),
+        { colors: { weekend: '#eeeeee' } },
+      )
+    // 平日の除外日(2026-07-14 火)を足すと、シェード矩形が
+    // ヘッダ帯 + 本文の 2 枚ぶん増える
+    const plain = countMatches(build(), /fill="#eeeeee"/g)
+    const withHoliday = countMatches(
+      build(new Set(['2026-07-14'])),
+      /fill="#eeeeee"/g,
+    )
+    expect(withHoliday).toBe(plain + 2)
+  })
+
   it('階層の深さでラベルをインデントする(depth 2 → x=36)', () => {
     const roots = scheduleTasks(
       spec([{ id: 't', title: 'X', start: '2026-07-13', estimate: '1d' }]),

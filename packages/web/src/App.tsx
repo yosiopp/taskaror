@@ -199,7 +199,7 @@ function App() {
 
   // spec / collapsedIds からスケジュール・ガントレイアウト・クリティカルパスを
   // 派生させる(計算失敗時は直近の正常結果を表示し続け、error にメッセージが入る)
-  const { visibleRows, layout, scheduled, criticalIds, error } =
+  const { visibleRows, layout, scheduled, criticalIds, holidays, error } =
     useDerivedGantt(spec, collapsedIds, today, hideCompleted)
 
   // --- ペイン幅(左グリッド)のドラッグリサイズ ---
@@ -609,6 +609,7 @@ function App() {
               selectedDependency={selectedDependency}
               criticalIds={criticalIds}
               showCritical={showCriticalPath}
+              holidays={holidays}
               onSelectBar={selectTask}
               onSelectDependency={handleSelectDependency}
               onUpdateTask={handleUpdate}

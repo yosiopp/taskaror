@@ -206,6 +206,23 @@ describe('computeGanttLayout: 期間と軸', () => {
     expect(layout.height).toBe(20)
   })
 
+  it('options.holidays の日付は isHoliday になる', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 'a', title: 'A', start: '2026-07-13', estimate: '1d' }]),
+      { today: TODAY },
+    )
+    const layout = computeGanttLayout(flattenScheduled(roots), {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+      paddingDays: 1,
+      holidays: new Set(['2026-07-14']),
+    })
+    // 範囲: 07-12(日), 07-13(月), 07-14(火=除外日)
+    expect(layout.days.map((d) => d.isHoliday)).toEqual([false, false, true])
+    expect(layout.days.map((d) => d.isWeekend)).toEqual([true, false, false])
+  })
+
   it('months は YYYY-MM でグルーピングし幅を日数 * dayWidth にする', () => {
     // 07-31(金)開始 1d を置くと余白込みで 07-30 〜 08-01 が範囲になり月をまたぐ
     const roots = scheduleTasks(
@@ -564,6 +581,13 @@ describe('shiftDateByBusinessDays', () => {
     // 月 -1 営業日 -> 前週金曜
     expect(shiftDateByBusinessDays('2026-07-13', -1)).toBe('2026-07-10')
   })
+
+  it('除外日(holidays)も飛ばす', () => {
+    // 金 +1 営業日、翌月曜(07-20)が除外日 -> 火曜
+    expect(
+      shiftDateByBusinessDays('2026-07-17', 1, new Set(['2026-07-20'])),
+    ).toBe('2026-07-21')
+  })
 })
 
 describe('estimateFromRange', () => {
@@ -578,5 +602,12 @@ describe('estimateFromRange', () => {
 
   it('終了が開始より前でも最小 1 営業日にクランプする', () => {
     expect(estimateFromRange('2026-07-13', '2026-07-10')).toBe('1d')
+  })
+
+  it('除外日(holidays)は営業日数に数えない', () => {
+    // 月〜金のうち水(07-15)が除外日 -> 4 営業日
+    expect(
+      estimateFromRange('2026-07-13', '2026-07-17', new Set(['2026-07-15'])),
+    ).toBe('4d')
   })
 })

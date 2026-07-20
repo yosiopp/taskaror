@@ -18,6 +18,7 @@ import {
   shiftDateByBusinessDays,
   shiftDateByDays,
 } from '@taskaror/core/gantt'
+import type { HolidaySet } from '@taskaror/core/date'
 import type { TaskFields } from '@taskaror/core/editor'
 import { HEADER_HEIGHT, MONTH_BAND_HEIGHT } from './constants'
 
@@ -48,6 +49,8 @@ export interface GanttChartProps {
   criticalIds: ReadonlySet<string>
   /** クリティカルパスの強調表示が ON か */
   showCritical: boolean
+  /** 営業日から除外する日付集合(info.holidays)。ドラッグ・キーボードの営業日計算に使う */
+  holidays: HolidaySet
   /** バークリック・キーボードでの行選択に連動 */
   onSelectBar: (id: string) => void
   /** 依存線(矢印)クリックでの選択。App でタスク選択と相互排他に調停する */
@@ -118,6 +121,7 @@ function GanttChart(props: GanttChartProps) {
     selectedDependency,
     criticalIds,
     showCritical,
+    holidays,
     onSelectBar,
     onSelectDependency,
     onUpdateTask,
@@ -269,9 +273,9 @@ function GanttChart(props: GanttChartProps) {
       <div className="gantt-inner" style={{ width }}>
         <div className="gantt-header" style={{ height: HEADER_HEIGHT }}>
           <svg width={width} height={HEADER_HEIGHT} role="presentation">
-            {/* 週末シェード(日ラベル帯) */}
+            {/* 週末・除外日シェード(日ラベル帯) */}
             {visibleDays.map((day) =>
-              day.isWeekend ? (
+              day.isWeekend || day.isHoliday ? (
                 <rect
                   key={`wh-${day.date}`}
                   className="gantt-weekend"
@@ -306,7 +310,9 @@ function GanttChart(props: GanttChartProps) {
               <text
                 key={`d-${day.date}`}
                 className={
-                  day.isWeekend ? 'gantt-day-label weekend' : 'gantt-day-label'
+                  day.isWeekend || day.isHoliday
+                    ? 'gantt-day-label weekend'
+                    : 'gantt-day-label'
                 }
                 x={day.x + dayWidth / 2}
                 y={MONTH_BAND_HEIGHT + DAY_BAND_HEIGHT / 2 + 4}
@@ -368,9 +374,9 @@ function GanttChart(props: GanttChartProps) {
             </marker>
           </defs>
 
-          {/* 週末列のシェード */}
+          {/* 週末・除外日列のシェード */}
           {visibleDays.map((day) =>
-            day.isWeekend ? (
+            day.isWeekend || day.isHoliday ? (
               <rect
                 key={`w-${day.date}`}
                 className="gantt-weekend"
@@ -452,6 +458,7 @@ function GanttChart(props: GanttChartProps) {
               selected={row.id === selectedId}
               critical={isCritical(row.id)}
               dayWidth={dayWidth}
+              holidays={holidays}
               onSelect={onSelectBar}
               onUpdateTask={onUpdateTask}
               onStartLink={startLink}
@@ -479,6 +486,8 @@ interface BarProps {
   critical: boolean
   /** 1 暦日あたりの px 幅(px 移動量 → 日数スナップに使う) */
   dayWidth: number
+  /** 営業日から除外する日付集合(リサイズ・キーボードの営業日計算に使う) */
+  holidays: HolidaySet
   onSelect: (id: string) => void
   onUpdateTask: (id: string, changes: Partial<TaskFields>) => void
   /**
@@ -506,6 +515,7 @@ function Bar({
   selected,
   critical,
   dayWidth,
+  holidays,
   onSelect,
   onUpdateTask,
   onStartLink,
@@ -570,7 +580,9 @@ function Bar({
       onUpdateTask(row.id, { start: shiftDateByDays(row.start, deltaDays) })
     } else {
       const newEnd = shiftDateByDays(row.end, deltaDays)
-      onUpdateTask(row.id, { estimate: estimateFromRange(row.start, newEnd) })
+      onUpdateTask(row.id, {
+        estimate: estimateFromRange(row.start, newEnd, holidays),
+      })
     }
   }
 
@@ -605,6 +617,7 @@ function Bar({
           start: shiftDateByBusinessDays(
             row.start,
             event.key === 'ArrowRight' ? 1 : -1,
+            holidays,
           ),
         })
         break

@@ -12,6 +12,8 @@ export interface TaskSpec {
 
 export interface TaskSpecInfo {
   title?: string
+  /** 営業日から除外する日付(YYYY-MM-DD)。導出では土日と同様に扱う */
+  holidays?: string[]
 }
 
 export interface Task {

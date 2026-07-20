@@ -4,7 +4,8 @@
  *
  * 規則(実装定義。利用者向けの説明は docs/site/docs/derivation.md):
  * - 期間(営業日)= ceil(工数時間 / 8h)。estimate 未指定は 0d のマイルストーン
- * - 開始日が土日なら翌営業日にずらす
+ * - 営業日 = 土日と info.holidays(除外日)を除いた日
+ * - 開始日が土日・除外日なら翌営業日にずらす
  * - depends を持つタスクは先行タスクの終了日の翌営業日から開始。
  *   ただし先行が 0d(マイルストーン)なら同日から開始する
  * - start が明示されたタスクはその日から開始する
@@ -24,6 +25,8 @@ import {
   minDate,
   parseDate,
   today,
+  toHolidaySet,
+  type HolidaySet,
 } from './date'
 
 export interface ScheduledTask {
@@ -57,6 +60,7 @@ export interface TaskStartFloor {
 /** スケジュール解決の内部機構。scheduleTasks と computeStartFloors で共有する */
 function createResolver(spec: TaskSpec, options: ScheduleOptions) {
   const todayDate = resolveToday(options.today)
+  const holidays = toHolidaySet(spec.info?.holidays)
 
   const taskById = new Map<string, Task>()
   const parentOf = new Map<Task, Task | undefined>()
@@ -70,7 +74,8 @@ function createResolver(spec: TaskSpec, options: ScheduleOptions) {
   indexTasks(spec.tasks)
 
   const projectEarliest = adjustToBusinessDay(
-    findEarliestStart(spec.tasks) ?? todayDate,
+    findEarliestStart(spec.tasks, holidays) ?? todayDate,
+    holidays,
   )
 
   const hasChildren = (task: Task): boolean => (task.tasks?.length ?? 0) > 0
@@ -86,7 +91,7 @@ function createResolver(spec: TaskSpec, options: ScheduleOptions) {
   // このタスクの開始下限(自身と祖先の start・depends から導く)。
   // 明示 start は祖先の下限より優先する。
   const effectiveFloor = (task: Task): Date => {
-    if (task.start) return adjustToBusinessDay(parseDate(task.start))
+    if (task.start) return adjustToBusinessDay(parseDate(task.start), holidays)
     const inherited = inheritedFloor(task)
     const latest = latestDepends(task)
     return latest ? maxDate(inherited, latest.date) : inherited
@@ -100,7 +105,7 @@ function createResolver(spec: TaskSpec, options: ScheduleOptions) {
   // 先行タスクの後に続くタスクの開始候補日。
   const successorStart = (pred: Task): Date => {
     const end = resolveEnd(pred)
-    return isMilestone(pred) ? end : addBusinessDays(end, 1)
+    return isMilestone(pred) ? end : addBusinessDays(end, 1, holidays)
   }
 
   // 自タスクの depends から導かれる開始下限(最も遅い先行とその successorStart)。
@@ -128,7 +133,7 @@ function createResolver(spec: TaskSpec, options: ScheduleOptions) {
     resolving.add(task)
     const start = hasChildren(task)
       ? task.tasks!.map(resolveStart).reduce(minDate)
-      : adjustToBusinessDay(effectiveFloor(task))
+      : adjustToBusinessDay(effectiveFloor(task), holidays)
     resolving.delete(task)
     startMemo.set(task, start)
     return start
@@ -139,12 +144,13 @@ function createResolver(spec: TaskSpec, options: ScheduleOptions) {
     if (cached) return cached
     const end = hasChildren(task)
       ? task.tasks!.map(resolveEnd).reduce(maxDate)
-      : businessDayEnd(resolveStart(task), durationDaysOf(task))
+      : businessDayEnd(resolveStart(task), durationDaysOf(task), holidays)
     endMemo.set(task, end)
     return end
   }
 
   return {
+    holidays,
     taskById,
     hasChildren,
     isMilestone,
@@ -160,7 +166,8 @@ export function scheduleTasks(
   options: ScheduleOptions = {},
 ): ScheduledTask[] {
   const resolver = createResolver(spec, options)
-  const { hasChildren, isMilestone, resolveStart, resolveEnd } = resolver
+  const { holidays, hasChildren, isMilestone, resolveStart, resolveEnd } =
+    resolver
 
   const build = (task: Task): ScheduledTask => {
     const start = resolveStart(task)
@@ -170,7 +177,7 @@ export function scheduleTasks(
       task,
       start: formatDate(start),
       end: formatDate(end),
-      durationDays: milestone ? 0 : businessDaysBetween(start, end),
+      durationDays: milestone ? 0 : businessDaysBetween(start, end, holidays),
       isMilestone: milestone,
       isSummary: hasChildren(task),
       children: hasChildren(task) ? task.tasks!.map(build) : [],
@@ -214,12 +221,15 @@ function resolveToday(value: ScheduleOptions['today']): Date {
 }
 
 /** プロジェクト内で最も早い明示 start(営業日補正済み)。1 つもなければ undefined */
-function findEarliestStart(tasks: Task[]): Date | undefined {
+function findEarliestStart(
+  tasks: Task[],
+  holidays: HolidaySet,
+): Date | undefined {
   let earliest: Date | undefined
   const walk = (list: Task[]): void => {
     for (const task of list) {
       if (task.start) {
-        const date = adjustToBusinessDay(parseDate(task.start))
+        const date = adjustToBusinessDay(parseDate(task.start), holidays)
         earliest = earliest ? minDate(earliest, date) : date
       }
       if (task.tasks) walk(task.tasks)

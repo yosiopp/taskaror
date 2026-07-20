@@ -1,6 +1,7 @@
 // ガントチャートのエクスポート共通処理。svg / png / pdf コマンドで共用する。
 // SVG の組み立ては web の SVG エクスポート(App.tsx の buildGanttSvg)と同じ流れ
 // (scheduleTasks → flattenScheduled → computeGanttLayout → renderGanttSvg)を踏襲する。
+import { toHolidaySet } from '@taskaror/core/date'
 import { computeGanttLayout, flattenScheduled } from '@taskaror/core/gantt'
 import { renderGanttSvg } from '@taskaror/core/ganttSvg'
 import { scheduleTasks } from '@taskaror/core/schedule'
@@ -9,7 +10,9 @@ import type { TaskSpec } from '@taskaror/core/types/taskspec'
 /** spec からガントチャートの自己完結した SVG 文字列を組み立てる */
 export function buildGanttSvg(spec: TaskSpec): string {
   const rows = flattenScheduled(scheduleTasks(spec))
-  const layout = computeGanttLayout(rows)
+  const layout = computeGanttLayout(rows, {
+    holidays: toHolidaySet(spec.info?.holidays),
+  })
   return renderGanttSvg(
     layout,
     rows.map((row) => ({ id: row.scheduled.task.id, depth: row.depth })),

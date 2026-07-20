@@ -57,6 +57,7 @@ derivation.md の導出規則から、次の記法を使う。
 | `hierarchy-depends`            | warning | depends が自分の祖先または子孫を指している                   |
 | `completed-before-predecessor` | warning | progress 100 のタスクの先行タスクが未完了                    |
 | `weekend-start`                | info    | 明示 start が土日                                            |
+| `holiday-start`                | info    | 明示 start が除外日(`info.holidays`)                         |
 
 ### parent-estimate(warning)
 
@@ -306,6 +307,43 @@ tasks:
 ```
 
 **根拠**: tasks.md 実装定義「開始日が土日に当たる場合は翌営業日にずらす」。
+
+### holiday-start(info)
+
+**検出条件**: 明示 start が `info.holidays` に列挙した除外日(土日と重なる場合は
+weekend-start に委ね、このルールでは指摘しない)。
+
+weekend-start と同趣旨。導出は開始日を自動で翌営業日にずらすため誤りではないが、
+YAML 上の値と描画される開始日がずれる。意図した日付か確認を促す。
+
+NG 例:
+
+```yaml
+info:
+  holidays:
+    - '2026-07-15'
+tasks:
+  - id: kickoff
+    title: キックオフ
+    start: '2026-07-15' # info: 除外日。導出では 2026-07-16(木)開始になる
+    estimate: 1d
+```
+
+修正例:
+
+```yaml
+info:
+  holidays:
+    - '2026-07-15'
+tasks:
+  - id: kickoff
+    title: キックオフ
+    start: '2026-07-16'
+    estimate: 1d
+```
+
+**根拠**: [導出ルール](derivation.md)「`info.holidays` に列挙した日付は土日と同様に
+営業日から除外する」。
 
 ## 検討して不採用としたルール
 
