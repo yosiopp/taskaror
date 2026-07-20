@@ -1,7 +1,7 @@
 /**
  * GUI エディタのルート。spec(undo/redo 履歴の present)・選択・折りたたみ・
  * ビューモード(ガント編集 / YAML / WBS 表)などの状態を束ね、spec から
- * スケジュール・ガントレイアウトを useMemo で派生させて各ビューに渡す。
+ * スケジュール・ガントレイアウトを useDerivedGantt で派生させて各ビューに渡す。
  * dispatch すると自動的に再スケジュール・再レイアウト・再描画される
  * (編集のリアルタイム反映)。読み込んだ YAML のコメント・キー順は baseDoc に
  * 保持し、保存時の忠実性(fidelity)に使う。
@@ -15,10 +15,8 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { DragEvent } from 'react'
 import sampleSource from '../../../examples/ecommerce.taskspec.yaml?raw'
 import Toolbar from './components/Toolbar'
-import type { ViewMode } from './components/Toolbar'
 import TaskGrid from './components/TaskGrid'
 import GanttChart from './components/GanttChart'
 import type { DependencyRef } from './components/GanttChart'
@@ -29,13 +27,7 @@ import TaskDialog from './components/TaskDialog'
 import AboutDialog from './components/AboutDialog'
 import LoadErrorNotice from './components/LoadError'
 import type { LoadError } from './components/LoadError'
-import {
-  DAY_WIDTH,
-  GANTT_DAY_OVERSCAN,
-  HEADER_HEIGHT,
-  MONTH_BAND_HEIGHT,
-  ROW_HEIGHT,
-} from './components/constants'
+import { HEADER_HEIGHT, MONTH_BAND_HEIGHT } from './components/constants'
 import { clampGridWidth, maxGridWidth } from './components/paneWidth'
 import {
   loadHideCompleted,
@@ -54,6 +46,11 @@ import {
   downloadText,
   ganttSvgToPngBlob,
 } from './lib/imageExport'
+import { usePersistentState } from './hooks/usePersistentState'
+import { useToday } from './hooks/useToday'
+import { useDayWindow } from './hooks/useDayWindow'
+import { useDerivedGantt } from './hooks/useDerivedGantt'
+import { useFileDrop } from './hooks/useFileDrop'
 import { canAddDependency, editorReducer, newTask } from '@taskaror/core/editor'
 import type {
   AddMode,
@@ -76,39 +73,9 @@ import {
   taskSpecFileName,
 } from '@taskaror/core/file'
 import { validateTaskSpec } from '@taskaror/core/validate'
-import { scheduleTasks } from '@taskaror/core/schedule'
-import type { ScheduledTask } from '@taskaror/core/schedule'
-import {
-  computeDayWindow,
-  computeGanttLayout,
-  filterCompleted,
-  flattenScheduled,
-  nextSelectionAfterRemoval,
-} from '@taskaror/core/gantt'
-import type { DayWindow, GanttLayout, GanttRow } from '@taskaror/core/gantt'
+import { nextSelectionAfterRemoval } from '@taskaror/core/gantt'
 import { renderGanttSvg } from '@taskaror/core/ganttSvg'
-import { computeCriticalPath } from '@taskaror/core/critical'
-import { formatDate, today as localToday } from '@taskaror/core/date'
 import type { Task, TaskSpec } from '@taskaror/core/types/taskspec'
-
-interface Derived {
-  visibleRows: GanttRow[]
-  layout: GanttLayout
-  /** スケジュール導出結果のツリー(WBS 表の開始・終了に使う) */
-  scheduled: ScheduledTask[]
-}
-
-const EMPTY_LAYOUT: GanttLayout = computeGanttLayout([], {
-  dayWidth: DAY_WIDTH,
-  rowHeight: ROW_HEIGHT,
-})
-
-/** 次のローカル深夜(0 時)までのミリ秒。日跨ぎで「今日」を更新するタイマーに使う */
-function msUntilNextLocalMidnight(): number {
-  const now = new Date()
-  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-  return next.getTime() - now.getTime()
-}
 
 /** 破棄確認を出すべき「編集中の内容」があるか */
 function hasEditContent(spec: TaskSpec): boolean {
@@ -180,15 +147,20 @@ function App() {
   const [aboutOpen, setAboutOpen] = useState(false)
   // ファイル読み込みの失敗内容(パース or 検証)。成功時・閉じたときは null
   const [loadError, setLoadError] = useState<LoadError | null>(null)
-  // 本文のビューモード(ガント編集 / YAML / WBS 表)
-  const [viewMode, setViewMode] = useState<ViewMode>(loadViewMode)
+  // 本文のビューモード(ガント編集 / YAML / WBS 表)。変更のたびに保存する
+  const [viewMode, setViewMode] = usePersistentState(loadViewMode, saveViewMode)
   // クリティカルパスの強調表示 ON/OFF(ガントのバー・矢印に反映)
-  const [showCriticalPath, setShowCriticalPath] =
-    useState<boolean>(loadShowCriticalPath)
+  const [showCriticalPath, setShowCriticalPath] = usePersistentState(
+    loadShowCriticalPath,
+    saveShowCriticalPath,
+  )
   // 完了タスク(progress === 100)を表示から隠すビューフィルタ(spec は変えない)
-  const [hideCompleted, setHideCompleted] = useState<boolean>(loadHideCompleted)
-  // 「今日」('YYYY-MM-DD')。今日線・スケジュールの基準日。日付をまたぐと更新する
-  const [today, setToday] = useState<string>(() => formatDate(localToday()))
+  const [hideCompleted, setHideCompleted] = usePersistentState(
+    loadHideCompleted,
+    saveHideCompleted,
+  )
+  // 「今日」('YYYY-MM-DD')。今日線・スケジュールの基準日。日付をまたぐと更新される
+  const today = useToday()
 
   // spec が変わるたびに localStorage へ保存する(リロードでの作業消失を防ぐ)。
   // ベース Document を使って忠実性を効かせるので、リロード後もコメント等が残る。
@@ -196,53 +168,6 @@ function App() {
   useEffect(() => {
     saveStoredSpec(spec, baseDoc)
   }, [spec, baseDoc])
-
-  // ビューモードを localStorage に保存する(次回起動時に同じビューで開く)
-  useEffect(() => {
-    saveViewMode(viewMode)
-  }, [viewMode])
-
-  // クリティカルパス表示の ON/OFF を localStorage に保存する
-  useEffect(() => {
-    saveShowCriticalPath(showCriticalPath)
-  }, [showCriticalPath])
-
-  // 完了タスク非表示の ON/OFF を localStorage に保存する
-  useEffect(() => {
-    saveHideCompleted(hideCompleted)
-  }, [hideCompleted])
-
-  // 日付をまたいだら「今日」を更新し、今日線・スケジュールを追従させる。
-  // 次のローカル深夜に setTimeout を張り、発火したら today を更新して次の深夜を張り直す。
-  // スリープ復帰やタブ復帰でタイマーがずれることがあるため、focus / visibilitychange でも
-  // 今日を再評価する。setToday は関数更新なので、依存配列を空にしても値は陳腐化しない。
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const sync = (): void => {
-      setToday((prev) => {
-        const now = formatDate(localToday())
-        return prev === now ? prev : now
-      })
-    }
-    const scheduleNext = (): void => {
-      // 深夜を確実に跨ぐよう少し余裕を足す
-      timer = setTimeout(() => {
-        sync()
-        scheduleNext()
-      }, msUntilNextLocalMidnight() + 1000)
-    }
-    scheduleNext()
-    const handleVisibility = (): void => {
-      if (document.visibilityState === 'visible') sync()
-    }
-    window.addEventListener('focus', sync)
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => {
-      if (timer !== undefined) clearTimeout(timer)
-      window.removeEventListener('focus', sync)
-      document.removeEventListener('visibilitychange', handleVisibility)
-    }
-  }, [])
 
   // キーボードショートカット: Cmd/Ctrl+Z で undo、Cmd/Ctrl+Shift+Z・Ctrl+Y で redo。
   // 入力欄など編集要素にフォーカスがある間はブラウザ既定の undo を邪魔しない。
@@ -272,52 +197,10 @@ function App() {
       ? (allTasks.find((flat) => flat.task.id === dialogTaskId)?.task ?? null)
       : null
 
-  // spec / collapsedIds からスケジュール・ガントレイアウトを派生させる。
-  // 不正な estimate 等で scheduleTasks が throw しうるので try/catch で囲む。
-  const computation = useMemo<
-    { ok: true; derived: Derived } | { ok: false; error: string }
-  >(() => {
-    try {
-      const scheduled = scheduleTasks(spec, { today })
-      // 完了タスク非表示は「ガント表示のフィルタ」。scheduled 本体(WBS 表・
-      // クリティカルパス算出に使う)は全タスクのまま保ち、表示行だけを絞る。
-      const displayRoots = hideCompleted
-        ? filterCompleted(scheduled)
-        : scheduled
-      const rows = flattenScheduled(displayRoots, collapsedIds)
-      const layout = computeGanttLayout(rows, {
-        dayWidth: DAY_WIDTH,
-        rowHeight: ROW_HEIGHT,
-        today,
-      })
-      return { ok: true, derived: { visibleRows: rows, layout, scheduled } }
-    } catch (thrown) {
-      const message = thrown instanceof Error ? thrown.message : String(thrown)
-      return { ok: false, error: message }
-    }
-  }, [spec, collapsedIds, today, hideCompleted])
-
-  // 直近の正常な派生結果を保持し、計算失敗時はこれを表示し続ける(アプリを落とさない)。
-  // 正常に計算できたらレンダー中に取り込む(収束するので追加のレンダーは 1 回のみ)。
-  const [lastGood, setLastGood] = useState<Derived>({
-    visibleRows: [],
-    layout: EMPTY_LAYOUT,
-    scheduled: [],
-  })
-  if (computation.ok && computation.derived !== lastGood) {
-    setLastGood(computation.derived)
-  }
-
-  const derived = computation.ok ? computation.derived : lastGood
-  const { visibleRows, layout } = derived
-  const error = computation.ok ? null : computation.error
-
-  // クリティカルパス(slack 0 のタスク鎖)の id 集合。スケジュール導出結果から算出する。
-  // scheduled は spec / today が変わると作り直されるので、その参照変化で再計算される。
-  const criticalIds = useMemo(
-    () => computeCriticalPath(derived.scheduled),
-    [derived.scheduled],
-  )
+  // spec / collapsedIds からスケジュール・ガントレイアウト・クリティカルパスを
+  // 派生させる(計算失敗時は直近の正常結果を表示し続け、error にメッセージが入る)
+  const { visibleRows, layout, scheduled, criticalIds, error } =
+    useDerivedGantt(spec, collapsedIds, today, hideCompleted)
 
   // --- ペイン幅(左グリッド)のドラッグリサイズ ---
   // 縦スクロールは 1 つの共有コンテナ(.editor-scroll)に集約したので、
@@ -345,67 +228,12 @@ function App() {
     saveStoredGridWidth(width)
   }
 
-  // --- ガント日カラムの仮想化(可視範囲だけ描く) ---
-  // 共有スクロール容器(.editor-scroll)の scrollLeft と可視幅を追跡し、frozen な
-  // グリッド幅を差し引いたガント領域の可視 X 範囲を日インデックス窓に変換する。
-  // これで総期間が長くても、描く日カラムを viewport 相当に抑えられる。
-  const editorScrollRef = useRef<HTMLDivElement>(null)
-  const [scrollMetrics, setScrollMetrics] = useState<{
-    scrollLeft: number
-    clientWidth: number
-  }>(() => ({
-    scrollLeft: 0,
-    // 初回レンダーでも概ね正しい窓を出せるよう、ウィンドウ幅で近似する(SSR は 0)。
-    clientWidth: typeof window === 'undefined' ? 0 : window.innerWidth,
-  }))
-
-  // スクロール容器の scrollLeft / clientWidth を onScroll + ResizeObserver で追跡する。
-  // 更新は rAF スロットルし、値が変わったときだけ state を更新して再描画を抑える。
-  useEffect(() => {
-    const element = editorScrollRef.current
-    if (element === null) return
-    let frame = 0
-    const measure = (): void => {
-      frame = 0
-      setScrollMetrics((prev) =>
-        prev.scrollLeft === element.scrollLeft &&
-        prev.clientWidth === element.clientWidth
-          ? prev
-          : {
-              scrollLeft: element.scrollLeft,
-              clientWidth: element.clientWidth,
-            },
-      )
-    }
-    const schedule = (): void => {
-      if (frame === 0) frame = requestAnimationFrame(measure)
-    }
-    measure() // 初期計測(マウント直後・ビュー切り替え直後)
-    element.addEventListener('scroll', schedule, { passive: true })
-    const observer = new ResizeObserver(schedule)
-    observer.observe(element)
-    return () => {
-      if (frame !== 0) cancelAnimationFrame(frame)
-      element.removeEventListener('scroll', schedule)
-      observer.disconnect()
-    }
-  }, [viewMode])
-
-  // 可視 X 範囲 → 日インデックス窓(オーバースキャン付き)。clientWidth 未計測(0)の
-  // 間はフル描画にフォールバックする(SSR など)。
-  const dayWindow = useMemo<DayWindow | null>(() => {
-    if (scrollMetrics.clientWidth <= 0) return null
-    const ganttViewport = Math.max(0, scrollMetrics.clientWidth - gridWidth)
-    const xStart = scrollMetrics.scrollLeft
-    const xEnd = scrollMetrics.scrollLeft + ganttViewport
-    return computeDayWindow(
-      layout.days.length,
-      layout.dayWidth,
-      xStart,
-      xEnd,
-      GANTT_DAY_OVERSCAN,
-    )
-  }, [scrollMetrics, gridWidth, layout.days.length, layout.dayWidth])
+  // ガント日カラムの仮想化(スクロール容器の可視範囲だけ日カラムを描く)
+  const { editorScrollRef, dayWindow } = useDayWindow(
+    viewMode,
+    gridWidth,
+    layout,
+  )
 
   // --- 選択(タスク ⇔ 依存線の相互排他) ---
   // タスク(行・バー)を選択したら依存線選択を解除し、依存線を選択したらタスク選択を
@@ -708,53 +536,11 @@ function App() {
       })
   }
 
-  // --- ドラッグ&ドロップ(画面全体で受ける) ---
-  // 子要素をまたぐたびに dragenter/dragleave が発火するため、深さを数えて
-  // 全体から出たとき(0 になったとき)だけオーバーレイを閉じる。
-  const dragDepth = useRef(0)
-  const [dragActive, setDragActive] = useState(false)
-
-  const isFileDrag = (event: DragEvent<HTMLDivElement>): boolean =>
-    event.dataTransfer.types.includes('Files')
-
-  const handleDragEnter = (event: DragEvent<HTMLDivElement>): void => {
-    if (!isFileDrag(event)) return
-    event.preventDefault()
-    dragDepth.current += 1
-    setDragActive(true)
-  }
-
-  const handleDragOver = (event: DragEvent<HTMLDivElement>): void => {
-    if (!isFileDrag(event)) return
-    event.preventDefault() // drop を許可するために必要
-  }
-
-  const handleDragLeave = (event: DragEvent<HTMLDivElement>): void => {
-    if (!isFileDrag(event)) return
-    dragDepth.current -= 1
-    if (dragDepth.current <= 0) {
-      dragDepth.current = 0
-      setDragActive(false)
-    }
-  }
-
-  const handleDrop = (event: DragEvent<HTMLDivElement>): void => {
-    if (!isFileDrag(event)) return
-    event.preventDefault()
-    dragDepth.current = 0
-    setDragActive(false)
-    const file = event.dataTransfer.files[0]
-    if (file) loadFromFile(file)
-  }
+  // 画面全体で .taskspec.yaml ファイルのドラッグ&ドロップを受ける
+  const { dragActive, dragHandlers } = useFileDrop(loadFromFile)
 
   return (
-    <div
-      className="app"
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <div className="app" {...dragHandlers}>
       <Toolbar
         title={spec.info?.title ?? ''}
         selectedId={selectedId}
@@ -850,7 +636,7 @@ function App() {
           }}
         />
       ) : (
-        <WbsTable spec={spec} scheduled={derived.scheduled} />
+        <WbsTable spec={spec} scheduled={scheduled} />
       )}
 
       {dragActive ? (
