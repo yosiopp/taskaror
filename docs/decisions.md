@@ -17,6 +17,16 @@ taskaror の実装で採用した決めごとをまとめる。スケジュー�
   decisions.md と development.md)
 - README は概要とリンク集にとどめ、操作方法・仕様の本文は docs/site/ に置く
 
+## 導出値は保存しない(Single Source of Truth)
+
+YAML に保存するのは人の入力のみとし、導出値(スケジュールの開始日・終了日、
+WBS 番号、クリティカルパス、ガントの座標など)は保存せず、コアの純粋関数
+(schedule / wbs / critical / gantt など)が表示・出力のたびに計算する。
+入力と導出値の二重管理を防ぐためで、導出値を保存するフィールドは仕様に追加しない
+(CLAUDE.md の「TaskSpec の設計原則」、利用者向けの説明は
+[site/docs/derivation.md](site/docs/derivation.md) を参照)。
+この方針は全体に適用されるため、各ソースコメントには個別に書かない。
+
 ## GUI(エディタ)
 
 - **「完了」の定義** — `progress === 100` を完了とする。[表示] メニューの

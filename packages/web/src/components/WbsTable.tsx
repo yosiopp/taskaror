@@ -1,7 +1,7 @@
 /**
  * WBS 番号付きテーブルビュー(読み取り中心)。
  * WBS 番号(1, 1.1, …)は computeWbs で導出し、開始・終了は scheduleTasks の
- * 導出値を使う(どちらも保存しない = Single Source of Truth)。
+ * 導出値を使う(どちらも保存しない)。
  * 行数が多くても崩れないよう縦スクロール可能にし、見出しは上部に固定する。
  */
 import { useMemo } from 'react'
