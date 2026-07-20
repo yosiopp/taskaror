@@ -9,7 +9,7 @@ export class TaskSpecError extends Error {}
 /**
  * YAML 文字列を TaskSpec として読み込む。
  * ここでは最低限の構造チェックのみ行う。schema/1.0/taskspec.schema.json に
- * よる完全なバリデーションはバリデーター実装時に追加する。
+ * よる完全なバリデーションは validate.ts(validateTaskSpec)が担う。
  */
 export function parseTaskSpec(source: string): TaskSpec {
   const data: unknown = parse(source)

@@ -2,7 +2,7 @@
  * スケジュール導出ロジック。TaskSpec ツリーから各タスクの開始日・終了日を計算する。
  * 導出値(開始日・終了日など)は保存せず、常にここで計算する(Single Source of Truth)。
  *
- * 規則(tasks.md の決めごと・実装定義に準拠):
+ * 規則(実装定義。利用者向けの説明は docs/site/docs/derivation.md):
  * - 期間(営業日)= ceil(工数時間 / 8h)。estimate 未指定は 0d のマイルストーン
  * - 開始日が土日なら翌営業日にずらす
  * - depends を持つタスクは先行タスクの終了日の翌営業日から開始。
@@ -183,7 +183,7 @@ export function scheduleTasks(
 /**
  * 各タスクの開始下限(祖先由来・depends 由来)を計算する。
  * scheduleTasks と同じ伝播ロジック(createResolver)を共有しており、
- * lint が明示 start との矛盾検出(docs/site/lint.md)に使う。キーはタスクオブジェクト。
+ * lint が明示 start との矛盾検出(docs/site/docs/lint.md)に使う。キーはタスクオブジェクト。
  */
 export function computeStartFloors(
   spec: TaskSpec,

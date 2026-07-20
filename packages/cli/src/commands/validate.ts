@@ -1,5 +1,5 @@
 // validate コマンド: spec ファイルを JSON Schema 検証+構造検証にかけ、問題を一覧表示する。
-// 検証本体はフェーズ 1 で実装済みの @taskaror/core/validate(validateTaskSpec =
+// 検証本体は @taskaror/core/validate(validateTaskSpec =
 // Ajv2020 + ajv-formats による schema/1.0/taskspec.schema.json 検証 → 構造検証)を再利用する。
 import type { Command } from '../cli'
 import { runFilesCommand } from '../filesCommand'

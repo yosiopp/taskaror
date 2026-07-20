@@ -32,7 +32,7 @@ export const GRID_WIDTH = 560
 /**
  * グリッドの列幅テンプレート(ヘッダ行と本文行で共有し、列を揃える)。
  * 各列を minmax(最小, 目安) にして、幅を狭めたときは目安から縮み、
- * 広いときは名前列(1fr)が余白を吸収する。既定幅では従来と同じ見え方になる。
+ * 広いときは名前列(1fr)が余白を吸収する。
  */
 export const GRID_COLUMNS =
   'minmax(92px, 1fr) minmax(40px, 56px) minmax(88px, 128px) minmax(56px, 88px) minmax(36px, 56px) minmax(40px, 76px)'

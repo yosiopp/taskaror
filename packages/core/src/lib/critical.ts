@@ -1,7 +1,7 @@
 /**
  * クリティカルパス(プロジェクト終了日を決める、余裕 slack = 0 のタスク鎖)の導出。
- * React・DOM・ブラウザ API に依存しない純粋関数として実装し、将来の CLI からも再利用できる
- * ようにする。導出値は保存せず常にここで計算する(Single Source of Truth)。
+ * React・DOM・ブラウザ API に依存しない純粋関数として実装する。
+ * 導出値は保存せず常にここで計算する(Single Source of Truth)。
  *
  * 前提・方針(CPM = Critical Path Method):
  * - 入力は schedule.ts の ScheduledTask ツリー。各タスクの最早開始(start)・最早終了(end)は

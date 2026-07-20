@@ -40,7 +40,7 @@ export function validateSchema(data: unknown): ValidationIssue[] {
 
 /**
  * スキーマでは表現できない構造検証(id の重複・depends の参照先・依存の循環)。
- * 型として妥当な TaskSpec を前提とする。将来の CLI validator でもそのまま再利用する。
+ * 型として妥当な TaskSpec を前提とする。web と CLI の validate 双方から再利用する。
  */
 export function validateStructure(spec: TaskSpec): ValidationIssue[] {
   const nodes = collectTaskNodes(spec.tasks)

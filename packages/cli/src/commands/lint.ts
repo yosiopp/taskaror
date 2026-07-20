@@ -1,5 +1,5 @@
 // lint コマンド: spec ファイルからスケジュール導出の意味論上の矛盾・怪しい記述を検出する。
-// ルールの仕様は docs/site/lint.md、検出本体は @taskaror/core/lint(lintTaskSpec)。
+// ルールの仕様は docs/site/docs/lint.md、検出本体は @taskaror/core/lint(lintTaskSpec)。
 // lint は valid な spec が前提のため、先に validateTaskSpec で検証し、
 // エラーがあれば lint せずに validate を促す。
 import { lintTaskSpec } from '@taskaror/core/lint'
@@ -24,7 +24,7 @@ function lintUsage(): string {
 /**
  * 1 ファイルを読み込んで lint し、指摘を表示する。
  * 指摘は「[重大度] パス (id): ルール ID: メッセージ」の形式で 1 件 1 行、
- * 先頭にサマリ行を出す。指摘がなければ OK 1 行(docs/site/lint.md「CLI の挙動」)。
+ * 先頭にサマリ行を出す。指摘がなければ OK 1 行(docs/site/docs/lint.md「CLI の挙動」)。
  */
 function lintFile(file: string): FileOutcome {
   // 構造が壊れた spec(循環など)に lint すると誤動作するため、先に validate 相当を通す

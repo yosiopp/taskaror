@@ -1,8 +1,10 @@
 /**
- * ガントエディタのルート。状態(spec / collapsedIds / selectedId)を束ね、
- * spec からスケジュール・ガントレイアウトを派生させて左グリッドと右ガントに渡す。
- * すべて spec / collapsedIds からの useMemo 派生なので、dispatch すると
- * 自動的に再スケジュール・再レイアウト・再描画される(編集のリアルタイム反映)。
+ * GUI エディタのルート。spec(undo/redo 履歴の present)・選択・折りたたみ・
+ * ビューモード(ガント編集 / YAML / WBS 表)などの状態を束ね、spec から
+ * スケジュール・ガントレイアウトを useMemo で派生させて各ビューに渡す。
+ * dispatch すると自動的に再スケジュール・再レイアウト・再描画される
+ * (編集のリアルタイム反映)。読み込んだ YAML のコメント・キー順は baseDoc に
+ * 保持し、保存時の忠実性(fidelity)に使う。
  */
 import './App.css'
 import {

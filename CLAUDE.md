@@ -69,7 +69,7 @@ TaskSpec は「仕様」、taskaror は「その実装のひとつ」という�
 2. [packages/core/src/types/taskspec.ts](packages/core/src/types/taskspec.ts) — スキーマと対応する TypeScript 型定義
 3. [packages/core/src/lib/taskspec.ts](packages/core/src/lib/taskspec.ts) — parse / serialize / flatten などのコアロジック(parse 自体は最小限の構造チェックのみ。schema.json による完全検証は [packages/core/src/lib/validate.ts](packages/core/src/lib/validate.ts) が担う)
 
-[packages/web/src/App.tsx](packages/web/src/App.tsx) は [examples/ecommerce.taskspec.yaml](examples/ecommerce.taskspec.yaml) を `?raw` インポートして表示するサンプル UI。
+[packages/web/src/App.tsx](packages/web/src/App.tsx) は GUI エディタのルートコンポーネント。初期データとして [examples/ecommerce.taskspec.yaml](examples/ecommerce.taskspec.yaml) を `?raw` インポートして表示する。
 
 ## TaskSpec の設計原則(コード変更時に守ること)
 

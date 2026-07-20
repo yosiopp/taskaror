@@ -1,8 +1,8 @@
 /**
- * グローバルヘッダのメニューバー([ファイル]・[編集]・[表示])。
+ * グローバルヘッダのメニューバー([ファイル]・[編集]・[表示]・[ヘルプ])。
  * クリックで開閉し、外側クリック・Esc で閉じる。キーボード操作に対応する
  * (←/→ でメニュー移動、↑/↓ で項目移動、Enter/Space で実行、Esc で閉じる)。
- * データ駆動(menus 配列)で描画し、項目の種類は action / checkbox / radio / separator。
+ * データ駆動(menus 配列)で描画し、項目の種類は action / checkbox / radio / link / separator。
  */
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'

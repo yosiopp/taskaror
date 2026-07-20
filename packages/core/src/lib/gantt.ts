@@ -1,7 +1,7 @@
 /**
  * ガントチャート描画のためのレイアウト計算。
  * React・DOM・ブラウザ API に依存しない純粋関数として実装し、
- * 将来の CLI(SVG 出力)からも再利用できるようにする。
+ * web のガント表示と CLI の svg / png / pdf 出力の両方から再利用する。
  *
  * 入力は schedule.ts の ScheduledTask ツリー。ここでは SVG 描画に必要な
  * 幾何情報(座標・寸法)だけを計算し、導出値は保存しない(Single Source of Truth)。
@@ -74,7 +74,7 @@ export function flattenScheduled(
 /**
  * 完了タスク(progress === 100)を表示から除くビューフィルタ。
  * spec は変更せず、スケジュール導出結果のツリーから完了ノード(とその子孫)を落とす。
- * 「完了」は progress === 100 と定義する(tasks.md の検討メモ)。
+ * 「完了」は progress === 100 と定義する。
  */
 export function filterCompleted(roots: ScheduledTask[]): ScheduledTask[] {
   const result: ScheduledTask[] = []
