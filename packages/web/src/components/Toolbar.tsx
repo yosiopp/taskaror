@@ -11,6 +11,8 @@ import type { ChangeEvent } from 'react'
 import MenuBar from './MenuBar'
 import type { Menu } from './MenuBar'
 import type { FilterSection } from './FilterDialog'
+import { isColumnVisible, isDefaultColumnState } from './gridColumns'
+import type { GridColumnKey, GridColumnState } from './gridColumns'
 import { Icon } from './icons'
 import type { IconName } from './icons'
 import { DOCS_URL, REPOSITORY_URL } from '../appInfo'
@@ -41,6 +43,12 @@ export interface ToolbarProps {
   onOpenFilter: (section?: FilterSection) => void
   /** すべてのフィルタを解除する */
   onClearFilter: () => void
+  /** 左グリッドのカラム状態(メニューのチェック表示に使う) */
+  columnState: GridColumnState
+  /** カラムの表示/非表示を切り替える */
+  onToggleColumn: (key: GridColumnKey) => void
+  /** カラムの表示・幅を既定状態に戻す */
+  onResetColumns: () => void
   /** ガントを SVG 画像として書き出す */
   onExportSvg: () => void
   /** ガントを PNG 画像として書き出す */
@@ -92,6 +100,9 @@ function Toolbar(props: ToolbarProps) {
     filterActive,
     onOpenFilter,
     onClearFilter,
+    columnState,
+    onToggleColumn,
+    onResetColumns,
     onExportSvg,
     onExportPng,
     onTitleChange,
@@ -230,6 +241,37 @@ function Toolbar(props: ToolbarProps) {
           label: 'クリティカルパスを強調',
           checked: showCriticalPath,
           onSelect: onToggleCriticalPath,
+        },
+        {
+          kind: 'submenu',
+          label: 'カラム',
+          items: [
+            {
+              kind: 'checkbox',
+              label: '担当者',
+              checked: isColumnVisible(columnState, 'assignees'),
+              onSelect: () => onToggleColumn('assignees'),
+            },
+            {
+              kind: 'checkbox',
+              label: 'タグ',
+              checked: isColumnVisible(columnState, 'tags'),
+              onSelect: () => onToggleColumn('tags'),
+            },
+            {
+              kind: 'checkbox',
+              label: '進捗率',
+              checked: isColumnVisible(columnState, 'progress'),
+              onSelect: () => onToggleColumn('progress'),
+            },
+            { kind: 'separator' },
+            {
+              kind: 'action',
+              label: 'カラムを既定に戻す',
+              onSelect: onResetColumns,
+              disabled: isDefaultColumnState(columnState),
+            },
+          ],
         },
         {
           kind: 'submenu',

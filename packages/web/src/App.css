@@ -369,6 +369,74 @@
   z-index: 3;
   border-right: 1px solid var(--border);
   background: var(--surface);
+  /* カラムのはみ出し(ペイン内横スクロール)をクリップする。
+     clip はスクロールコンテナを作らないので、ヘッダの sticky top は
+     共有スクロール容器(.editor-scroll)基準のまま保たれる */
+  overflow-x: clip;
+}
+
+/* ヘッダ・行の列トラック。カラム合計幅を持ち、ペイン内横スクロールでは
+   left(負値)をずらして表示範囲を切り替える(transform だと fixed 配置の
+   依存ポップオーバーの基準がずれるため使わない) */
+.grid-header-track,
+.grid-rows-track {
+  position: relative;
+}
+
+.grid-header-track {
+  display: grid;
+  align-items: center;
+  height: 100%;
+}
+
+/* 列見出しの境界に置くリサイザ(ドラッグ/左右キーで列幅を変更)。
+   境界線上に中央寄せした細い当たり判定で、hover/focus 時に縦線を強調する */
+.col-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 1;
+}
+
+.col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+}
+
+.col-resizer:hover::after,
+.col-resizer:focus-visible::after {
+  background: var(--accent);
+}
+
+.col-resizer:focus-visible {
+  outline: none;
+}
+
+/* ペイン内横スクロールの実体になるスクロールバー。sticky bottom で
+   グリッドが縦に長くても常に画面下端に見える(全カラムが収まるときは出さない) */
+.grid-hscroll {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  height: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.grid-hscroll-spacer {
+  height: 1px;
 }
 
 /* --- ペイン境界のセパレータ(ドラッグ/キーで幅変更) --- */
@@ -414,12 +482,11 @@ body.is-resizing-cols {
   user-select: none;
 }
 
+/* 列見出し(sticky top)。列のグリッドレイアウトは内側の .grid-header-track が持つ */
 .grid-header {
   position: sticky;
   top: 0;
   z-index: 2;
-  display: grid;
-  align-items: center;
   background: var(--surface-alt);
   border-bottom: 1px solid var(--border);
 }

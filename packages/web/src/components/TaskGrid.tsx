@@ -2,25 +2,48 @@
  * 左ペインの編集可能なタスクグリッド。
  * visibleRows(flattenScheduled の結果)を 1 行ずつ ROW_HEIGHT 固定で描き、
  * ガントと行を揃える。セルはインライン編集でき、コミットは updateTask を dispatch する。
+ * カラムは columnState(gridColumns.ts)に従って表示/非表示・幅を切り替え、
+ * 全カラムがペインに収まらないときはペイン内で横スクロールする。
  */
 import { useEffect, useRef, useState } from 'react'
-import type { ChangeEvent, DragEvent, KeyboardEvent, ReactElement } from 'react'
+import type {
+  ChangeEvent,
+  DragEvent,
+  KeyboardEvent,
+  PointerEvent,
+  ReactElement,
+} from 'react'
 import type { GanttRow } from '@taskaror/core/gantt'
 import { collectAncestors } from '@taskaror/core/editor'
 import type { DropPosition, TaskFields } from '@taskaror/core/editor'
 import { ESTIMATE_RE } from '@taskaror/core/estimate'
 import type { FlatTask } from '@taskaror/core/taskspec'
 import type { Task } from '@taskaror/core/types/taskspec'
-import { GRID_COLUMNS, HEADER_HEIGHT, ROW_HEIGHT } from './constants'
+import { HEADER_HEIGHT, ROW_HEIGHT } from './constants'
+import {
+  GRID_COLUMN_MAX_WIDTH,
+  columnWidth,
+  gridTemplate,
+  isColumnVisible,
+  totalColumnsWidth,
+  visibleColumnDefs,
+} from './gridColumns'
+import type {
+  GridColumnDef,
+  GridColumnKey,
+  GridColumnState,
+} from './gridColumns'
 
 /** インライン編集できる列(依存は専用ポップオーバーのため含めない) */
-type EditableField = 'title' | 'estimate' | 'start' | 'assignees' | 'progress'
+type EditableField =
+  'title' | 'estimate' | 'start' | 'assignees' | 'tags' | 'progress'
 
 const EDITABLE_FIELDS: EditableField[] = [
   'title',
   'estimate',
   'start',
   'assignees',
+  'tags',
   'progress',
 ]
 
@@ -37,6 +60,10 @@ export interface TaskGridProps {
   selectedId: string | null
   /** グリッド列の幅(px)。セパレータのドラッグで変わる */
   gridWidth: number
+  /** カラムの表示状態と幅([表示] → [カラム] メニューとドラッグで変わる) */
+  columnState: GridColumnState
+  /** 列見出しの境界ドラッグ・キー操作での列幅変更を反映する */
+  onResizeColumn: (key: GridColumnKey, width: number) => void
   /** 行を選択する。空グリッド行へフォーカスを移すときは null で選択解除する */
   onSelect: (id: string | null) => void
   onToggleCollapse: (id: string) => void
@@ -53,8 +80,6 @@ export interface TaskGridProps {
 const INITIAL_EMPTY_ROWS = 100
 /** 「行を追加」で一度に増やす行数の既定値 */
 const ADD_ROWS_STEP = 100
-/** 空行に描く列セル数(GRID_COLUMNS の列数と一致させ、列罫線を通す) */
-const EMPTY_CELLS = [0, 1, 2, 3, 4, 5]
 
 function TaskGrid(props: TaskGridProps) {
   const {
@@ -62,6 +87,8 @@ function TaskGrid(props: TaskGridProps) {
     allTasks,
     selectedId,
     gridWidth,
+    columnState,
+    onResizeColumn,
     onSelect,
     onToggleCollapse,
     onUpdate,
@@ -86,6 +113,65 @@ function TaskGrid(props: TaskGridProps) {
     id: string
     position: DropPosition
   } | null>(null)
+
+  // --- カラム構成と横スクロール ---
+  // ペイン(.grid-col)は overflow-x: clip でスクロールコンテナにしない
+  // (ヘッダの sticky top を共有スクロール容器基準のまま保つため)。
+  // 横スクロールは sticky bottom の細いスクロールバー(.grid-hscroll)を実体とし、
+  // その scrollLeft をヘッダ/行トラックの left オフセットに反映して実現する。
+  const colRef = useRef<HTMLDivElement>(null)
+  const rowsRef = useRef<HTMLDivElement>(null)
+  const hscrollRef = useRef<HTMLDivElement>(null)
+  const [scrollX, setScrollX] = useState(0)
+
+  const columns = visibleColumnDefs(columnState)
+  const template = gridTemplate(columnState)
+  const totalWidth = totalColumnsWidth(columnState)
+  // インライン編集対象のうち表示中の列(Tab 移動は非表示列を飛ばす)
+  const editableFields = EDITABLE_FIELDS.filter((field) =>
+    isColumnVisible(columnState, field),
+  )
+
+  // ペインの内容幅(境界線 1px を除く)に全カラムが収まらない分だけスクロールできる
+  const maxScrollX = Math.max(0, totalWidth - Math.max(0, gridWidth - 1))
+  const offsetX = Math.min(scrollX, maxScrollX)
+  // トラックはカラム合計幅。ペインの方が広ければ 100% に伸ばし、
+  // 末尾のフィラー列(minmax(0, 1fr))が右側の余白を埋める
+  const trackStyle = {
+    width: totalWidth,
+    minWidth: '100%',
+    left: -offsetX,
+  } as const
+
+  // 横ホイール・トラックパッドの横パン(と Shift+縦ホイール)で列を横スクロールする。
+  // 共有スクロール容器(ガント側の横スクロール)へ伝播させないため preventDefault が
+  // 必要で、React の onWheel は passive 登録のため使えない。native リスナを自前で張る。
+  useEffect(() => {
+    const el = colRef.current
+    if (el === null) return
+    const handleWheel = (event: WheelEvent): void => {
+      const bar = hscrollRef.current
+      if (bar === null) return
+      const delta =
+        event.deltaX !== 0 ? event.deltaX : event.shiftKey ? event.deltaY : 0
+      if (delta === 0) return
+      const max = bar.scrollWidth - bar.clientWidth
+      const next = Math.min(Math.max(bar.scrollLeft + delta, 0), max)
+      // 端に達していたら消費せず、外側(ガント)のスクロールに委ねる
+      if (next === bar.scrollLeft) return
+      event.preventDefault()
+      bar.scrollLeft = next
+    }
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheel)
+  }, [])
+
+  // スクロールバーの実位置を描画中のオフセットに合わせる(列の表示切替などで
+  // バーが付け直された直後や、スクロール上限が縮んだときのずれを解消する)
+  useEffect(() => {
+    const bar = hscrollRef.current
+    if (bar !== null && bar.scrollLeft !== offsetX) bar.scrollLeft = offsetX
+  }, [offsetX, maxScrollX])
 
   // 実効的な空行フォーカス。空行フォーカスは「タスク未選択」のときだけ意味を持つ。
   // こうすると、クリック選択・セル編集・グローバルショートカット(Insert 追加等)・
@@ -185,34 +271,40 @@ function TaskGrid(props: TaskGridProps) {
     if (!editing) return
     if (event.key === 'Enter') {
       event.preventDefault()
-      navigate(neighborCell(visibleRows, editing, 'down'))
+      navigate(neighborCell(visibleRows, editing, 'down', editableFields))
     } else if (event.key === 'Escape') {
       event.preventDefault()
       cancel()
     } else if (event.key === 'Tab') {
       event.preventDefault()
       navigate(
-        neighborCell(visibleRows, editing, event.shiftKey ? 'left' : 'right'),
+        neighborCell(
+          visibleRows,
+          editing,
+          event.shiftKey ? 'left' : 'right',
+          editableFields,
+        ),
       )
     }
   }
 
   // --- ↑/↓ での行フォーカス移動(本文コンテナで keydown を拾う) ---
-  // タスク行と空グリッド行は本文の直接の子 div として visibleRows → 空行の順に
-  // 並ぶので、子インデックスはタスク行 = i、空行 = visibleRows.length + e で引ける。
+  // タスク行と空グリッド行は行トラック(rowsRef)の直接の子 div として
+  // visibleRows → 空行の順に並ぶので、子インデックスはタスク行 = i、
+  // 空行 = visibleRows.length + e で引ける。
 
   /** index 番目のタスク行へフォーカス(選択)を移し、画面外なら可視化する */
   const focusTaskRow = (index: number): void => {
     setEmptyFocus(null)
     onSelect(visibleRows[index].scheduled.task.id)
-    bodyRef.current?.children[index]?.scrollIntoView({ block: 'nearest' })
+    rowsRef.current?.children[index]?.scrollIntoView({ block: 'nearest' })
   }
 
   /** index 番目の空グリッド行へフォーカスを移す。タスク選択は解除する */
   const focusEmptyRow = (index: number): void => {
     onSelect(null)
     setEmptyFocus(index)
-    bodyRef.current?.children[visibleRows.length + index]?.scrollIntoView({
+    rowsRef.current?.children[visibleRows.length + index]?.scrollIntoView({
       block: 'nearest',
     })
   }
@@ -380,7 +472,7 @@ function TaskGrid(props: TaskGridProps) {
     const placeholder =
       field === 'estimate'
         ? '例: 1.5d'
-        : field === 'assignees'
+        : field === 'assignees' || field === 'tags'
           ? 'カンマ区切り'
           : ''
     return <input type="text" placeholder={placeholder} {...common} />
@@ -389,24 +481,42 @@ function TaskGrid(props: TaskGridProps) {
   const isEditing = (id: string, field: EditableField): boolean =>
     editing !== null && editing.id === id && editing.field === field
 
+  const visible = (key: GridColumnKey): boolean =>
+    isColumnVisible(columnState, key)
+
+  // 列見出しの境界に置くリサイザ(各列の右端 = 先頭からの累積幅に絶対配置する)
+  const columnResizers = columns.map((def, index) => (
+    <ColumnResizer
+      key={def.key}
+      def={def}
+      left={columns
+        .slice(0, index + 1)
+        .reduce((sum, d) => sum + columnWidth(columnState, d.key), 0)}
+      width={columnWidth(columnState, def.key)}
+      onResize={(width) => onResizeColumn(def.key, width)}
+    />
+  ))
+
   return (
     <div
       className="grid-col"
+      ref={colRef}
       style={{ flex: `0 0 ${gridWidth}px`, width: gridWidth }}
     >
-      <div
-        className="grid-header"
-        style={{
-          height: HEADER_HEIGHT,
-          gridTemplateColumns: GRID_COLUMNS,
-        }}
-      >
-        <span className="grid-th">タスク名</span>
-        <span className="grid-th">見積</span>
-        <span className="grid-th">開始</span>
-        <span className="grid-th">担当</span>
-        <span className="grid-th">進捗</span>
-        <span className="grid-th">依存</span>
+      <div className="grid-header" style={{ height: HEADER_HEIGHT }}>
+        <div
+          className="grid-header-track"
+          style={{ ...trackStyle, gridTemplateColumns: template }}
+        >
+          {columns.map((def) => (
+            <span key={def.key} className="grid-th">
+              {def.label}
+            </span>
+          ))}
+          {/* フィラー列(右側の余白)にも見出し背景と列罫線を通す */}
+          <span className="grid-th" aria-hidden="true" />
+          {columnResizers}
+        </div>
       </div>
 
       <div
@@ -415,119 +525,137 @@ function TaskGrid(props: TaskGridProps) {
         tabIndex={0}
         onKeyDown={handleBodyKeyDown}
       >
-        {visibleRows.map((row) => {
-          const task = row.scheduled.task
-          const selected = task.id === selectedId
-          const dropClass =
-            dropTarget?.id === task.id ? ` drop-${dropTarget.position}` : ''
-          return (
-            <div
-              key={task.id}
-              className={`grid-row${selected ? ' selected' : ''}${dropClass}`}
-              style={{ height: ROW_HEIGHT, gridTemplateColumns: GRID_COLUMNS }}
-              onClick={() => onSelect(task.id)}
-              onDoubleClick={() => handleRowDoubleClick(task.id)}
-              onDragOver={(event) => handleRowDragOver(event, task.id)}
-              onDrop={(event) => handleRowDrop(event, task.id)}
-            >
-              {/* タスク名(グリップ + インデント + 展開折りたたみ + 名称編集) */}
+        <div className="grid-rows-track" ref={rowsRef} style={trackStyle}>
+          {visibleRows.map((row) => {
+            const task = row.scheduled.task
+            const selected = task.id === selectedId
+            const dropClass =
+              dropTarget?.id === task.id ? ` drop-${dropTarget.position}` : ''
+            return (
               <div
-                className="grid-cell cell-name"
-                style={{ paddingLeft: 6 + row.depth * 16 }}
+                key={task.id}
+                className={`grid-row${selected ? ' selected' : ''}${dropClass}`}
+                style={{ height: ROW_HEIGHT, gridTemplateColumns: template }}
+                onClick={() => onSelect(task.id)}
+                onDoubleClick={() => handleRowDoubleClick(task.id)}
+                onDragOver={(event) => handleRowDragOver(event, task.id)}
+                onDrop={(event) => handleRowDrop(event, task.id)}
               >
-                <span
-                  className="drag-handle"
-                  draggable
-                  role="button"
-                  aria-label="ドラッグして移動"
-                  title="ドラッグして移動"
-                  onDragStart={(event) => handleDragStart(event, task.id)}
-                  onDragEnd={handleDragEnd}
+                {/* タスク名(グリップ + インデント + 展開折りたたみ + 名称編集) */}
+                <div
+                  className="grid-cell cell-name"
+                  style={{ paddingLeft: 6 + row.depth * 16 }}
                 >
-                  ⠿
-                </span>
-                {row.hasChildren ? (
-                  <button
-                    type="button"
-                    className="collapse-toggle"
-                    aria-label={row.collapsed ? '展開' : '折りたたみ'}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onToggleCollapse(task.id)
-                    }}
-                  >
-                    {row.collapsed ? '▶' : '▼'}
-                  </button>
-                ) : (
-                  <span className="collapse-spacer" aria-hidden="true" />
-                )}
-                {isEditing(task.id, 'title') ? (
-                  renderInput('title')
-                ) : (
                   <span
-                    className="cell-text title"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      startEdit(task.id, 'title', task)
-                    }}
+                    className="drag-handle"
+                    draggable
+                    role="button"
+                    aria-label="ドラッグして移動"
+                    title="ドラッグして移動"
+                    onDragStart={(event) => handleDragStart(event, task.id)}
+                    onDragEnd={handleDragEnd}
                   >
-                    {task.title || '(無題)'}
+                    ⠿
                   </span>
-                )}
+                  {row.hasChildren ? (
+                    <button
+                      type="button"
+                      className="collapse-toggle"
+                      aria-label={row.collapsed ? '展開' : '折りたたみ'}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onToggleCollapse(task.id)
+                      }}
+                    >
+                      {row.collapsed ? '▶' : '▼'}
+                    </button>
+                  ) : (
+                    <span className="collapse-spacer" aria-hidden="true" />
+                  )}
+                  {isEditing(task.id, 'title') ? (
+                    renderInput('title')
+                  ) : (
+                    <span
+                      className="cell-text title"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        startEdit(task.id, 'title', task)
+                      }}
+                    >
+                      {task.title || '(無題)'}
+                    </span>
+                  )}
+                </div>
+
+                <EditableCell
+                  editing={isEditing(task.id, 'estimate')}
+                  display={task.estimate ?? ''}
+                  onActivate={() => startEdit(task.id, 'estimate', task)}
+                  input={renderInput('estimate')}
+                />
+                <EditableCell
+                  editing={isEditing(task.id, 'start')}
+                  display={row.scheduled.start}
+                  muted={task.start === undefined}
+                  onActivate={() => startEdit(task.id, 'start', task)}
+                  input={renderInput('start')}
+                />
+                {visible('assignees') ? (
+                  <EditableCell
+                    editing={isEditing(task.id, 'assignees')}
+                    display={(task.assignees ?? []).join(', ')}
+                    onActivate={() => startEdit(task.id, 'assignees', task)}
+                    input={renderInput('assignees')}
+                  />
+                ) : null}
+                {visible('tags') ? (
+                  <EditableCell
+                    editing={isEditing(task.id, 'tags')}
+                    display={(task.tags ?? []).join(', ')}
+                    onActivate={() => startEdit(task.id, 'tags', task)}
+                    input={renderInput('tags')}
+                  />
+                ) : null}
+                {visible('progress') ? (
+                  <EditableCell
+                    editing={isEditing(task.id, 'progress')}
+                    display={task.progress != null ? `${task.progress}%` : ''}
+                    onActivate={() => startEdit(task.id, 'progress', task)}
+                    input={renderInput('progress')}
+                  />
+                ) : null}
+
+                <DependsEditor
+                  task={task}
+                  allTasks={allTasks}
+                  onChange={(depends) => onUpdate(task.id, { depends })}
+                />
+                {/* フィラー列。依存列の右側にも列罫線を通す */}
+                <span className="grid-cell" aria-hidden="true" />
               </div>
+            )
+          })}
 
-              <EditableCell
-                editing={isEditing(task.id, 'estimate')}
-                display={task.estimate ?? ''}
-                onActivate={() => startEdit(task.id, 'estimate', task)}
-                input={renderInput('estimate')}
-              />
-              <EditableCell
-                editing={isEditing(task.id, 'start')}
-                display={row.scheduled.start}
-                muted={task.start === undefined}
-                onActivate={() => startEdit(task.id, 'start', task)}
-                input={renderInput('start')}
-              />
-              <EditableCell
-                editing={isEditing(task.id, 'assignees')}
-                display={(task.assignees ?? []).join(', ')}
-                onActivate={() => startEdit(task.id, 'assignees', task)}
-                input={renderInput('assignees')}
-              />
-              <EditableCell
-                editing={isEditing(task.id, 'progress')}
-                display={task.progress != null ? `${task.progress}%` : ''}
-                onActivate={() => startEdit(task.id, 'progress', task)}
-                input={renderInput('progress')}
-              />
-
-              <DependsEditor
-                task={task}
-                allTasks={allTasks}
-                onChange={(depends) => onUpdate(task.id, { depends })}
-              />
+          {/* 空行(スプレッドシート風)。クリック、または ↑/↓ でフォーカスして
+              文字入力/Enter で末尾に新規タスクを作る */}
+          {Array.from({ length: emptyRows }, (_, i) => (
+            <div
+              key={`empty-${i}`}
+              className={`grid-row grid-row-empty${activeEmptyFocus === i ? ' focused' : ''}`}
+              style={{ height: ROW_HEIGHT, gridTemplateColumns: template }}
+              onClick={handleEmptyRowClick}
+              title="クリックして新しいタスクを追加"
+            >
+              {/* 表示列 + フィラー列のセルを描いて列罫線を通す */}
+              {Array.from({ length: columns.length + 1 }, (_, c) => (
+                <span key={c} className="grid-cell" aria-hidden="true" />
+              ))}
             </div>
-          )
-        })}
+          ))}
+        </div>
 
-        {/* 空行(スプレッドシート風)。クリック、または ↑/↓ でフォーカスして
-            文字入力/Enter で末尾に新規タスクを作る */}
-        {Array.from({ length: emptyRows }, (_, i) => (
-          <div
-            key={`empty-${i}`}
-            className={`grid-row grid-row-empty${activeEmptyFocus === i ? ' focused' : ''}`}
-            style={{ height: ROW_HEIGHT, gridTemplateColumns: GRID_COLUMNS }}
-            onClick={handleEmptyRowClick}
-            title="クリックして新しいタスクを追加"
-          >
-            {EMPTY_CELLS.map((c) => (
-              <span key={c} className="grid-cell" aria-hidden="true" />
-            ))}
-          </div>
-        ))}
-
-        {/* 最下端の行追加 UI(スプレッドシート風の「○行 追加」) */}
+        {/* 最下端の行追加 UI(スプレッドシート風の「○行 追加」)。
+            横スクロールに追従させず、ペイン幅のまま据え置く */}
         <div className="grid-add-rows">
           <button
             type="button"
@@ -538,7 +666,92 @@ function TaskGrid(props: TaskGridProps) {
           </button>
         </div>
       </div>
+
+      {/* 全カラムがペインに収まらないときだけ出す横スクロールバー。
+          sticky bottom で常に画面下端に見え、これが横スクロール量の実体になる */}
+      {maxScrollX > 0 ? (
+        <div
+          className="grid-hscroll"
+          ref={hscrollRef}
+          onScroll={(event) => setScrollX(event.currentTarget.scrollLeft)}
+        >
+          <div className="grid-hscroll-spacer" style={{ width: totalWidth }} />
+        </div>
+      ) : null}
     </div>
+  )
+}
+
+/** 列幅の微調整キー幅(Shift 併用で大きく動かす) */
+const COL_KEY_STEP = 8
+const COL_KEY_STEP_LARGE = 32
+
+interface ColumnResizerProps {
+  def: GridColumnDef
+  /** トラック左端からの境界位置(px)= この列の右端 */
+  left: number
+  /** この列の現在幅(px) */
+  width: number
+  /** ドラッグ・キー操作での幅変更(クランプは呼び出し側の setColumnWidth が行う) */
+  onResize: (width: number) => void
+}
+
+/**
+ * 列見出しの右境界に置くリサイザ。ドラッグ・左右キーで列幅を変更し、
+ * ダブルクリックで既定幅に戻す(ペインのセパレータと同じ操作感)。
+ */
+function ColumnResizer({ def, left, width, onResize }: ColumnResizerProps) {
+  // ドラッグ開始時の clientX と列幅。null なら非ドラッグ
+  const startRef = useRef<{ x: number; width: number } | null>(null)
+
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>): void => {
+    // テキスト選択やフォーカス移動を抑止しつつドラッグを開始する
+    event.preventDefault()
+    startRef.current = { x: event.clientX, width }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    document.body.classList.add('is-resizing-cols')
+  }
+
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>): void => {
+    const start = startRef.current
+    if (start === null) return
+    onResize(start.width + (event.clientX - start.x))
+  }
+
+  const handlePointerUp = (event: PointerEvent<HTMLDivElement>): void => {
+    if (startRef.current === null) return
+    startRef.current = null
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    document.body.classList.remove('is-resizing-cols')
+  }
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const step = event.shiftKey ? COL_KEY_STEP_LARGE : COL_KEY_STEP
+    let next: number | null = null
+    if (event.key === 'ArrowLeft') next = width - step
+    else if (event.key === 'ArrowRight') next = width + step
+    if (next === null) return
+    event.preventDefault()
+    onResize(next)
+  }
+
+  return (
+    <div
+      className="col-resizer"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={`${def.label}列の幅。ドラッグまたは左右キーで変更`}
+      aria-valuenow={width}
+      aria-valuemin={def.minWidth}
+      aria-valuemax={GRID_COLUMN_MAX_WIDTH}
+      tabIndex={0}
+      style={{ left }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onKeyDown={handleKeyDown}
+      onDoubleClick={() => onResize(def.defaultWidth)}
+    />
   )
 }
 
@@ -716,6 +929,8 @@ function fieldToString(task: Task, field: EditableField): string {
       return task.start ?? ''
     case 'assignees':
       return (task.assignees ?? []).join(', ')
+    case 'tags':
+      return (task.tags ?? []).join(', ')
     case 'progress':
       return task.progress != null ? String(task.progress) : ''
   }
@@ -740,6 +955,8 @@ function buildChanges(
       return { start: value }
     case 'assignees':
       return { assignees: splitCsv(value) }
+    case 'tags':
+      return { tags: splitCsv(value) }
     case 'progress': {
       if (value === '') return { progress: undefined }
       const num = Number(value)
@@ -767,15 +984,18 @@ function findTask(rows: GanttRow[], id: string): Task | undefined {
 
 /**
  * 現在セルの上下左右の隣接セルを返す。端では折り返す / null(移動なし)を返す。
+ * fields には表示中の編集可能列を渡す(非表示列は Tab 移動でも飛ばす)。
  */
 function neighborCell(
   rows: GanttRow[],
   cell: EditingCell,
   direction: 'down' | 'up' | 'left' | 'right',
+  fields: EditableField[],
 ): EditingCell | null {
   const rowIndex = rows.findIndex((row) => row.scheduled.task.id === cell.id)
   if (rowIndex === -1) return null
-  const colIndex = EDITABLE_FIELDS.indexOf(cell.field)
+  const colIndex = fields.indexOf(cell.field)
+  if (colIndex === -1) return null
 
   if (direction === 'down' || direction === 'up') {
     const nextRow = rowIndex + (direction === 'down' ? 1 : -1)
@@ -787,17 +1007,17 @@ function neighborCell(
   const step = direction === 'right' ? 1 : -1
   let nextCol = colIndex + step
   let nextRow = rowIndex
-  if (nextCol >= EDITABLE_FIELDS.length) {
+  if (nextCol >= fields.length) {
     nextCol = 0
     nextRow += 1
   } else if (nextCol < 0) {
-    nextCol = EDITABLE_FIELDS.length - 1
+    nextCol = fields.length - 1
     nextRow -= 1
   }
   if (nextRow < 0 || nextRow >= rows.length) return null
   return {
     id: rows[nextRow].scheduled.task.id,
-    field: EDITABLE_FIELDS[nextCol],
+    field: fields[nextCol],
   }
 }
 

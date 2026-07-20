@@ -32,12 +32,20 @@ import type { LoadError } from './components/LoadError'
 import { HEADER_HEIGHT, MONTH_BAND_HEIGHT } from './components/constants'
 import { clampGridWidth, maxGridWidth } from './components/paneWidth'
 import {
+  DEFAULT_GRID_COLUMN_STATE,
+  setColumnWidth,
+  toggleColumn,
+} from './components/gridColumns'
+import type { GridColumnKey } from './components/gridColumns'
+import {
   loadGanttFilter,
+  loadGridColumnState,
   loadShowCriticalPath,
   loadStoredGridWidth,
   loadStoredSpec,
   loadViewMode,
   saveGanttFilter,
+  saveGridColumnState,
   saveShowCriticalPath,
   saveStoredGridWidth,
   saveStoredSpec,
@@ -165,6 +173,26 @@ function App() {
     loadGanttFilter,
     saveGanttFilter,
   )
+  // 左グリッドのカラム状態(表示/非表示・幅)。変更のたびに保存する
+  const [columnState, setColumnState] = usePersistentState(
+    loadGridColumnState,
+    saveGridColumnState,
+  )
+
+  /** [表示] → [カラム] メニューでの列の表示/非表示切り替え */
+  const handleToggleColumn = (key: GridColumnKey): void => {
+    setColumnState((prev) => toggleColumn(prev, key))
+  }
+
+  /** カラムの表示・幅を既定状態(タグのみ非表示)に戻す */
+  const handleResetColumns = (): void => {
+    setColumnState(DEFAULT_GRID_COLUMN_STATE)
+  }
+
+  /** 列見出しの境界ドラッグ・キー操作での列幅変更(クランプは setColumnWidth が行う) */
+  const handleResizeColumn = (key: GridColumnKey, width: number): void => {
+    setColumnState((prev) => setColumnWidth(prev, key, width))
+  }
   // フィルターダイアログの開閉(section は開いたとき最初にフォーカスする節)
   const [filterDialog, setFilterDialog] = useState<{
     section?: FilterSection
@@ -577,6 +605,9 @@ function App() {
         filterActive={isGanttFilterActive(filter)}
         onOpenFilter={(section) => setFilterDialog({ section })}
         onClearFilter={() => setFilter(EMPTY_GANTT_FILTER)}
+        columnState={columnState}
+        onToggleColumn={handleToggleColumn}
+        onResetColumns={handleResetColumns}
         onExportSvg={handleExportSvg}
         onExportPng={handleExportPng}
         onTitleChange={(title) => dispatch({ type: 'setInfoTitle', title })}
@@ -622,6 +653,8 @@ function App() {
               allTasks={allTasks}
               selectedId={selectedId}
               gridWidth={gridWidth}
+              columnState={columnState}
+              onResizeColumn={handleResizeColumn}
               onSelect={selectTask}
               onToggleCollapse={handleToggleCollapse}
               onUpdate={handleUpdate}
