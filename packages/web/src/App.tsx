@@ -32,16 +32,28 @@ import type { LoadError } from './components/LoadError'
 import {
   DAY_WIDTH,
   GANTT_DAY_OVERSCAN,
-  GRID_WIDTH,
   HEADER_HEIGHT,
   MONTH_BAND_HEIGHT,
   ROW_HEIGHT,
 } from './components/constants'
+import { clampGridWidth, maxGridWidth } from './components/paneWidth'
 import {
-  clampGridWidth,
-  maxGridWidth,
-  parseStoredGridWidth,
-} from './components/paneWidth'
+  loadHideCompleted,
+  loadShowCriticalPath,
+  loadStoredGridWidth,
+  loadStoredSpec,
+  loadViewMode,
+  saveHideCompleted,
+  saveShowCriticalPath,
+  saveStoredGridWidth,
+  saveStoredSpec,
+  saveViewMode,
+} from './lib/storage'
+import {
+  downloadBlob,
+  downloadText,
+  ganttSvgToPngBlob,
+} from './lib/imageExport'
 import { canAddDependency, editorReducer, newTask } from '@taskaror/core/editor'
 import type {
   AddMode,
@@ -91,242 +103,11 @@ const EMPTY_LAYOUT: GanttLayout = computeGanttLayout([], {
   rowHeight: ROW_HEIGHT,
 })
 
-/** localStorage の保存キー(旧: JSON 形式。後方互換のため読み込みのみ対応) */
-const STORAGE_KEY = 'taskaror:spec'
-/** localStorage の保存キー(新: YAML テキスト。コメント等の忠実性を保つ) */
-const STORAGE_KEY_YAML = 'taskaror:spec.yaml'
-
-/** localStorage から文字列を読む(失敗しても null を返す) */
-function readStorage(key: string): string | null {
-  if (typeof localStorage === 'undefined') return null
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-
-/**
- * localStorage から編集内容を復元する(ブラウザ専用)。
- * 新形式(YAML テキスト)を優先し、コメント等を保持したベース Document も復元する。
- * 旧形式(JSON)からは spec のみ移行する(忠実性のベースは持てないので doc は null)。
- * 未保存・壊れている・検証に通らない場合は null を返し、サンプルにフォールバックさせる。
- */
-function loadStoredSpec(): { spec: TaskSpec; doc: Document | null } | null {
-  // 新形式: YAML テキスト(ベース Document も一緒に復元してコメント等を保つ)
-  const yamlText = readStorage(STORAGE_KEY_YAML)
-  if (yamlText !== null) {
-    try {
-      const parsed = parseTaskSpecDocument(yamlText)
-      if (validateTaskSpec(parsed.spec).length === 0) return parsed
-    } catch {
-      // 壊れていれば旧形式・サンプルへフォールバックする
-    }
-  }
-  // 旧形式: JSON(コメント等のベースは持てないので plain 扱い)
-  const json = readStorage(STORAGE_KEY)
-  if (json !== null) {
-    try {
-      const data: unknown = JSON.parse(json)
-      if (validateTaskSpec(data).length === 0) {
-        return { spec: data as TaskSpec, doc: null }
-      }
-    } catch {
-      // ignore
-    }
-  }
-  return null
-}
-
-/**
- * 編集内容を localStorage に YAML テキストで保存する(ブラウザ専用。失敗しても無視する)。
- * baseDoc があれば忠実性を効かせて serialize するので、リロード後もコメント等が残る。
- */
-function saveStoredSpec(spec: TaskSpec, baseDoc: Document | null): void {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(STORAGE_KEY_YAML, serializeTaskSpec(spec, baseDoc))
-  } catch {
-    // 容量超過やプライベートモードでの失敗は無視する
-  }
-}
-
-/** ビューモードの保存キー */
-const VIEW_MODE_KEY = 'taskaror:viewMode'
-
-/** 妥当なビューモードか(localStorage 由来の値の検証に使う) */
-function isViewMode(value: unknown): value is ViewMode {
-  return value === 'gantt' || value === 'yaml' || value === 'wbs'
-}
-
-/** localStorage から保存済みのビューモードを復元する(未保存・不正なら 'gantt') */
-function loadViewMode(): ViewMode {
-  if (typeof localStorage === 'undefined') return 'gantt'
-  try {
-    const raw = localStorage.getItem(VIEW_MODE_KEY)
-    return isViewMode(raw) ? raw : 'gantt'
-  } catch {
-    return 'gantt'
-  }
-}
-
-/** ビューモードを localStorage に保存する(ブラウザ専用。失敗しても無視する) */
-function saveViewMode(mode: ViewMode): void {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(VIEW_MODE_KEY, mode)
-  } catch {
-    // 容量超過やプライベートモードでの失敗は無視する
-  }
-}
-
-/** グリッド幅の保存キー */
-const GRID_WIDTH_KEY = 'taskaror:gridWidth'
-
-/**
- * localStorage から保存済みのグリッド幅を復元する(ブラウザ専用)。
- * 未保存・壊れている・範囲外なら既定幅にフォールバックする。SSR では既定幅。
- */
-function loadStoredGridWidth(): number {
-  if (typeof window === 'undefined') return GRID_WIDTH
-  const max = maxGridWidth(window.innerWidth)
-  let raw: string | null
-  try {
-    raw = localStorage.getItem(GRID_WIDTH_KEY)
-  } catch {
-    return clampGridWidth(GRID_WIDTH, max)
-  }
-  return parseStoredGridWidth(raw, max, GRID_WIDTH)
-}
-
-/** グリッド幅を localStorage に保存する(ブラウザ専用。失敗しても無視する) */
-function saveStoredGridWidth(width: number): void {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(GRID_WIDTH_KEY, String(Math.round(width)))
-  } catch {
-    // 容量超過やプライベートモードでの失敗は無視する
-  }
-}
-
-/** クリティカルパス表示の保存キー */
-const CRITICAL_PATH_KEY = 'taskaror:criticalPath'
-
-/** クリティカルパス表示の ON/OFF を復元する(未保存・不正なら OFF) */
-function loadShowCriticalPath(): boolean {
-  if (typeof localStorage === 'undefined') return false
-  try {
-    return localStorage.getItem(CRITICAL_PATH_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-/** クリティカルパス表示の ON/OFF を保存する(ブラウザ専用。失敗しても無視する) */
-function saveShowCriticalPath(on: boolean): void {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(CRITICAL_PATH_KEY, on ? '1' : '0')
-  } catch {
-    // 容量超過やプライベートモードでの失敗は無視する
-  }
-}
-
-/** 完了タスク非表示の保存キー */
-const HIDE_COMPLETED_KEY = 'taskaror:hideCompleted'
-
-/** 完了タスク非表示の ON/OFF を復元する(未保存・不正なら OFF) */
-function loadHideCompleted(): boolean {
-  if (typeof localStorage === 'undefined') return false
-  try {
-    return localStorage.getItem(HIDE_COMPLETED_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-/** 完了タスク非表示の ON/OFF を保存する(ブラウザ専用。失敗しても無視する) */
-function saveHideCompleted(on: boolean): void {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(HIDE_COMPLETED_KEY, on ? '1' : '0')
-  } catch {
-    // 容量超過やプライベートモードでの失敗は無視する
-  }
-}
-
 /** 次のローカル深夜(0 時)までのミリ秒。日跨ぎで「今日」を更新するタイマーに使う */
 function msUntilNextLocalMidnight(): number {
   const now = new Date()
   const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   return next.getTime() - now.getTime()
-}
-
-/** Blob をファイルとしてダウンロードさせる(ブラウザ専用) */
-function downloadBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = fileName
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
-}
-
-/** テキストをファイルとしてダウンロードさせる(ブラウザ専用) */
-function downloadText(text: string, fileName: string): void {
-  downloadBlob(new Blob([text], { type: 'text/yaml;charset=utf-8' }), fileName)
-}
-
-/**
- * SVG 文字列を PNG の Blob に変換する(canvas 経由。ブラウザ専用)。
- * devicePixelRatio で高解像度化する(メモリ過大を避けるため上限 2 倍)。
- * 画像サイズは SVG が持つ width/height から取得する。
- */
-function ganttSvgToPngBlob(svgString: string): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    if (typeof document === 'undefined') {
-      reject(new Error('ブラウザ環境が必要です'))
-      return
-    }
-    const scale = Math.min(
-      typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1,
-      2,
-    )
-    const svgBlob = new Blob([svgString], {
-      type: 'image/svg+xml;charset=utf-8',
-    })
-    const url = URL.createObjectURL(svgBlob)
-    const image = new Image()
-    image.onload = (): void => {
-      const w = image.naturalWidth || image.width
-      const h = image.naturalHeight || image.height
-      try {
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.max(1, Math.round(w * scale))
-        canvas.height = Math.max(1, Math.round(h * scale))
-        const ctx = canvas.getContext('2d')
-        if (ctx === null)
-          throw new Error('canvas 2D コンテキストを取得できません')
-        ctx.scale(scale, scale)
-        ctx.drawImage(image, 0, 0)
-        canvas.toBlob((out) => {
-          URL.revokeObjectURL(url)
-          if (out) resolve(out)
-          else reject(new Error('PNG の生成に失敗しました'))
-        }, 'image/png')
-      } catch (thrown) {
-        URL.revokeObjectURL(url)
-        reject(thrown instanceof Error ? thrown : new Error(String(thrown)))
-      }
-    }
-    image.onerror = (): void => {
-      URL.revokeObjectURL(url)
-      reject(new Error('SVG の画像化に失敗しました'))
-    }
-    image.src = url
-  })
 }
 
 /** 破棄確認を出すべき「編集中の内容」があるか */
