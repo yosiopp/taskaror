@@ -5,9 +5,24 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>taskaror</title>
+    <style>
+      /* React マウント前(JS バンドル実行まで)だけ見える起動時プレースホルダー。
+         バンドル CSS の到着を待たずに効くよう、ここにインラインで持つ */
+      .boot-loading {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        color: #888888;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <p class="boot-loading">読み込み中…</p>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
