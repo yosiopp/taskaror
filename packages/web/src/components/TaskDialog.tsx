@@ -139,7 +139,7 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
         </div>
 
         <div className="task-dialog-body">
-          <label className="task-field task-field-id">
+          <label className="task-field task-field-id task-field-span-4">
             <span className="task-field-label">ID</span>
             <input
               type="text"
@@ -152,7 +152,7 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
             ) : null}
           </label>
 
-          <label className="task-field task-field-wide">
+          <label className="task-field task-field-span-8">
             <span className="task-field-label">タスク名</span>
             <input
               ref={titleRef}
@@ -162,7 +162,7 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
             />
           </label>
 
-          <label className="task-field">
+          <label className="task-field task-field-span-4">
             <span className="task-field-label">見積</span>
             <input
               type="text"
@@ -178,7 +178,7 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
             ) : null}
           </label>
 
-          <label className="task-field">
+          <label className="task-field task-field-span-4">
             <span className="task-field-label">開始</span>
             <input
               type="date"
@@ -187,17 +187,7 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
             />
           </label>
 
-          <label className="task-field">
-            <span className="task-field-label">担当</span>
-            <input
-              type="text"
-              value={assignees}
-              placeholder="カンマ区切り"
-              onChange={(e) => setAssignees(e.target.value)}
-            />
-          </label>
-
-          <label className="task-field">
+          <label className="task-field task-field-span-4">
             <span className="task-field-label">進捗(%)</span>
             <input
               type="number"
@@ -209,7 +199,17 @@ function TaskDialog({ task, allTasks, onClose, onSubmit }: TaskDialogProps) {
             />
           </label>
 
-          <label className="task-field task-field-wide">
+          <label className="task-field task-field-span-6">
+            <span className="task-field-label">担当</span>
+            <input
+              type="text"
+              value={assignees}
+              placeholder="カンマ区切り"
+              onChange={(e) => setAssignees(e.target.value)}
+            />
+          </label>
+
+          <label className="task-field task-field-span-6">
             <span className="task-field-label">タグ</span>
             <input
               type="text"

@@ -977,7 +977,8 @@ body.is-gantt-linking * {
 
 .task-dialog-body {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* 12 カラムのグリッド。各フィールドは task-field-span-* で幅(カラム数)を指定する */
+  grid-template-columns: repeat(12, 1fr);
   gap: 0.75rem 1rem;
   padding: 0.9rem;
   overflow-y: auto;
@@ -992,6 +993,19 @@ body.is-gantt-linking * {
 
 .task-field-wide {
   grid-column: 1 / -1;
+}
+
+/* 12 カラム中の占有カラム数(ID:4 + タスク名:8 / 見積:4 + 開始:4 + 進捗:4 / 担当:6 + タグ:6) */
+.task-field-span-4 {
+  grid-column: span 4;
+}
+
+.task-field-span-6 {
+  grid-column: span 6;
+}
+
+.task-field-span-8 {
+  grid-column: span 8;
 }
 
 .task-field-label {
