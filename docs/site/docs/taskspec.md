@@ -2,7 +2,7 @@
 
 TaskSpec は taskaror が採用する YAML ベースのタスク定義フォーマットです。人・AI・Git が扱いやすいことを重視し、保存するのは人の入力のみ(Single Source of Truth)。開始日・終了日・WBS 番号などの導出値は保存せず、レンダラーが計算します([スケジュール導出ルール](derivation.md))。
 
-JSON Schema は [schema/1.0/taskspec.schema.json](https://github.com/yosiopp/taskaror/blob/main/schema/1.0/taskspec.schema.json) が正です。サンプルは [examples/](https://github.com/yosiopp/taskaror/tree/main/examples) にあります。最小構成の例(minimal)から、担当者・進捗・タグを活用した例(conference)、深いネスト・マイルストーン・`x-` 拡張などフォーマットの表現力を示す例(product-launch)まで揃えています。
+JSON Schema は [schema/1.0/taskspec.schema.json](https://github.com/yosiopp/taskaror/blob/main/schema/1.0/taskspec.schema.json) が正です。サンプルは [examples/](https://github.com/yosiopp/taskaror/tree/main/examples) にあります。最小構成の例(minimal)から、担当者・進捗・タグを活用した例(conference)、深いネスト・マイルストーン・`x-` 拡張などフォーマットの表現力を示す例(product-launch)、日本の祝日(2026 年)を除外日にした通年の例(japan-holidays-2026)まで揃えています。
 
 ## 例
 
