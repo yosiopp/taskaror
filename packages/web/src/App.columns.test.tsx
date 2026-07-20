@@ -1,7 +1,8 @@
 /**
  * App の UI テスト: グリッドのカラム表示([表示] → [カラム])。
- * 担当者・タグ・進捗率の表示切り替え、タグ列の既定非表示、タグセルのインライン編集、
- * 既定へのリセット、カラム状態の localStorage 永続化を検証する。
+ * 担当者・タグ・進捗率・メモの表示切り替え、タグ・メモ列の既定非表示、
+ * タグセルのインライン編集、メモ列の表示専用、既定へのリセット、
+ * カラム状態の localStorage 永続化を検証する。
  */
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -24,7 +25,7 @@ async function openColumnMenu(user: User): Promise<void> {
 }
 
 describe('App のグリッドカラム表示', () => {
-  it('既定ではタグ列だけが非表示になっている', () => {
+  it('既定ではタグ列とメモ列が非表示になっている', () => {
     render(<App />)
     expect(headerLabels()).toEqual([
       'タスク名',
@@ -34,6 +35,27 @@ describe('App のグリッドカラム表示', () => {
       '進捗',
       '依存',
     ])
+  })
+
+  it('メモ列を表示できる(セルは表示専用でインライン編集できない)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await openColumnMenu(user)
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'メモ' }))
+    expect(headerLabels()).toEqual([
+      'タスク名',
+      '見積',
+      '開始',
+      '担当',
+      '進捗',
+      '依存',
+      'メモ',
+    ])
+
+    // メモ列が増えても、インライン編集できるセルは従来の 4 つのまま
+    const row = screen.getByText('DB設計').closest('.grid-row') as HTMLElement
+    expect(row.querySelectorAll('.grid-cell.editable')).toHaveLength(4)
   })
 
   it('メニューからタグ列を表示でき、再マウント後も維持される', async () => {

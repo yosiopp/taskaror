@@ -11,6 +11,7 @@ import {
   isColumnVisible,
   isDefaultColumnState,
   parseStoredGridColumnState,
+  serializeGridColumnState,
   setColumnWidth,
   toggleColumn,
   totalColumnsWidth,
@@ -18,16 +19,17 @@ import {
 } from './gridColumns'
 
 describe('カラム定義と既定状態', () => {
-  it('カラム定義は重複なく、非表示にできるのは担当・タグ・進捗のみ', () => {
+  it('カラム定義は重複なく、非表示にできるのは担当・タグ・進捗・メモのみ', () => {
     const keys = GRID_COLUMN_DEFS.map((def) => def.key)
     expect(new Set(keys).size).toBe(keys.length)
     expect(
       GRID_COLUMN_DEFS.filter((def) => def.hideable).map((def) => def.key),
-    ).toEqual(['assignees', 'tags', 'progress'])
+    ).toEqual(['assignees', 'tags', 'progress', 'note'])
   })
 
-  it('既定状態はタグ列のみ非表示で、幅の変更なし', () => {
+  it('既定状態はタグ列とメモ列が非表示で、幅の変更なし', () => {
     expect(isColumnVisible(DEFAULT_GRID_COLUMN_STATE, 'tags')).toBe(false)
+    expect(isColumnVisible(DEFAULT_GRID_COLUMN_STATE, 'note')).toBe(false)
     expect(isColumnVisible(DEFAULT_GRID_COLUMN_STATE, 'assignees')).toBe(true)
     expect(isColumnVisible(DEFAULT_GRID_COLUMN_STATE, 'progress')).toBe(true)
     expect(isDefaultColumnState(DEFAULT_GRID_COLUMN_STATE)).toBe(true)
@@ -112,15 +114,34 @@ describe('parseStoredGridColumnState', () => {
 
   it('保存された表示状態・幅を復元する(空の hidden は全列表示)', () => {
     const parsed = parseStoredGridColumnState(
-      JSON.stringify({ hidden: [], widths: { title: 300 } }),
+      JSON.stringify({ v: 2, hidden: [], widths: { title: 300 } }),
     )
     expect(parsed.hidden).toEqual([])
     expect(columnWidth(parsed, 'title')).toBe(300)
   })
 
+  it('serialize → parse で表示状態・幅がそのまま往復する', () => {
+    const state = setColumnWidth(
+      toggleColumn(DEFAULT_GRID_COLUMN_STATE, 'note'),
+      'start',
+      200,
+    )
+    const parsed = parseStoredGridColumnState(serializeGridColumnState(state))
+    expect(parsed).toEqual(state)
+    expect(isColumnVisible(parsed, 'note')).toBe(true)
+  })
+
+  it('バージョンの無い旧保存データでは note 列を非表示側へ補う', () => {
+    const parsed = parseStoredGridColumnState(
+      JSON.stringify({ hidden: [], widths: {} }),
+    )
+    expect(parsed.hidden).toEqual(['note'])
+  })
+
   it('不正な hidden・widths は検証して落とす', () => {
     const parsed = parseStoredGridColumnState(
       JSON.stringify({
+        v: 2,
         hidden: ['tags', 'title', 'unknown', 'tags', 42],
         widths: { title: 'wide', unknown: 100, start: 5, estimate: 56 },
       }),
@@ -133,8 +154,8 @@ describe('parseStoredGridColumnState', () => {
     expect(parsed.widths.estimate).toBeUndefined()
   })
 
-  it('hidden が無い場合は既定(タグのみ非表示)に落とす', () => {
+  it('hidden が無い場合は既定(タグ・メモ非表示)に落とす', () => {
     const parsed = parseStoredGridColumnState(JSON.stringify({ widths: {} }))
-    expect(parsed.hidden).toEqual(['tags'])
+    expect(parsed.hidden).toEqual(['tags', 'note'])
   })
 })

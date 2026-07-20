@@ -6,7 +6,14 @@
 
 /** グリッドのカラム識別子(表示順) */
 export type GridColumnKey =
-  'title' | 'estimate' | 'start' | 'assignees' | 'tags' | 'progress' | 'depends'
+  | 'title'
+  | 'estimate'
+  | 'start'
+  | 'assignees'
+  | 'tags'
+  | 'progress'
+  | 'depends'
+  | 'note'
 
 export interface GridColumnDef {
   key: GridColumnKey
@@ -77,6 +84,13 @@ export const GRID_COLUMN_DEFS: readonly GridColumnDef[] = [
     minWidth: 40,
     hideable: false,
   },
+  {
+    key: 'note',
+    label: 'メモ',
+    defaultWidth: 160,
+    minWidth: 64,
+    hideable: true,
+  },
 ]
 
 /** カラムの表示状態と幅(localStorage に保存するビュー設定) */
@@ -87,11 +101,18 @@ export interface GridColumnState {
   widths: Partial<Record<GridColumnKey, number>>
 }
 
-/** 既定状態: タグ列のみ非表示、幅はすべて既定 */
+/** 既定状態: タグ列・メモ列が非表示、幅はすべて既定 */
 export const DEFAULT_GRID_COLUMN_STATE: GridColumnState = {
-  hidden: ['tags'],
+  hidden: ['tags', 'note'],
   widths: {},
 }
+
+/**
+ * 保存形式のバージョン。カラムを追加したら上げる。
+ * 旧バージョンの保存データでは新カラムの表示/非表示を選べていないため、
+ * 復元時に新カラム(note)を非表示側へ補い、突然列が現れないようにする。
+ */
+export const GRID_COLUMN_STATE_VERSION = 2
 
 function defOf(key: GridColumnKey): GridColumnDef {
   // GRID_COLUMN_DEFS は全 GridColumnKey を網羅している(テストで保証)
@@ -195,10 +216,16 @@ function isHideableKey(value: unknown): value is GridColumnKey {
   return GRID_COLUMN_DEFS.some((def) => def.key === value && def.hideable)
 }
 
+/** カラム状態を localStorage 保存用の JSON 文字列にする(バージョン付き) */
+export function serializeGridColumnState(state: GridColumnState): string {
+  return JSON.stringify({ v: GRID_COLUMN_STATE_VERSION, ...state })
+}
+
 /**
  * localStorage から読んだ生文字列を検証してカラム状態に変換する。
  * 未保存・壊れている場合は既定状態。hidden は hideable な列だけを残し、
  * widths は既知の列の有限数値だけをクランプして取り込む。
+ * バージョンが古い保存データでは、当時存在しなかった note 列を非表示側へ補う。
  */
 export function parseStoredGridColumnState(
   raw: string | null,
@@ -218,6 +245,10 @@ export function parseStoredGridColumnState(
   const hidden = Array.isArray(record.hidden)
     ? [...new Set(record.hidden.filter(isHideableKey))]
     : [...DEFAULT_GRID_COLUMN_STATE.hidden]
+
+  const legacy =
+    typeof record.v !== 'number' || record.v < GRID_COLUMN_STATE_VERSION
+  if (legacy && !hidden.includes('note')) hidden.push('note')
 
   const widths: Partial<Record<GridColumnKey, number>> = {}
   if (typeof record.widths === 'object' && record.widths !== null) {

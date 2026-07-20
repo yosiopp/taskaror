@@ -8,7 +8,10 @@
 import type { ViewMode } from '../components/Toolbar'
 import { GRID_WIDTH } from '../components/constants'
 import { maxGridWidth, parseStoredGridWidth } from '../components/paneWidth'
-import { parseStoredGridColumnState } from '../components/gridColumns'
+import {
+  parseStoredGridColumnState,
+  serializeGridColumnState,
+} from '../components/gridColumns'
 import type { GridColumnState } from '../components/gridColumns'
 import { serializeTaskSpec } from '@taskaror/core/taskspec'
 import { parseTaskSpecDocument } from '@taskaror/core/fidelity'
@@ -131,9 +134,9 @@ export function loadGridColumnState(): GridColumnState {
   return parseStoredGridColumnState(readStorage(GRID_COLUMNS_KEY))
 }
 
-/** カラム状態を localStorage に保存する */
+/** カラム状態を localStorage に保存する(バージョン付き JSON) */
 export function saveGridColumnState(state: GridColumnState): void {
-  writeStorage(GRID_COLUMNS_KEY, JSON.stringify(state))
+  writeStorage(GRID_COLUMNS_KEY, serializeGridColumnState(state))
 }
 
 /** クリティカルパス表示の保存キー */

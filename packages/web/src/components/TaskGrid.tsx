@@ -630,7 +630,8 @@ function TaskGrid(props: TaskGridProps) {
                   allTasks={allTasks}
                   onChange={(depends) => onUpdate(task.id, { depends })}
                 />
-                {/* フィラー列。依存列の右側にも列罫線を通す */}
+                {visible('note') ? <NoteCell note={task.note} /> : null}
+                {/* フィラー列。末尾の列の右側にも列罫線を通す */}
                 <span className="grid-cell" aria-hidden="true" />
               </div>
             )
@@ -789,6 +790,26 @@ function EditableCell({
         <span className={muted ? 'cell-text muted' : 'cell-text'}>
           {display}
         </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * メモ(note)の表示専用セル。note は複数行の Markdown を持てるため、
+ * 単一行 input のインライン編集では改行が失われる。編集は行ダブルクリックの
+ * ダイアログ(textarea)に委ね、ここでは先頭行だけを表示する。
+ */
+function NoteCell({ note }: { note?: string }) {
+  const text = note ?? ''
+  const lines = text.split('\n')
+  const display = lines.length > 1 ? `${lines[0]} …` : lines[0]
+  return (
+    <div className="grid-cell" title={text || undefined}>
+      {display === '' ? (
+        <span className="cell-placeholder">—</span>
+      ) : (
+        <span className="cell-text">{display}</span>
       )}
     </div>
   )

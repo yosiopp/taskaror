@@ -264,6 +264,12 @@ function Toolbar(props: ToolbarProps) {
               checked: isColumnVisible(columnState, 'progress'),
               onSelect: () => onToggleColumn('progress'),
             },
+            {
+              kind: 'checkbox',
+              label: 'メモ',
+              checked: isColumnVisible(columnState, 'note'),
+              onSelect: () => onToggleColumn('note'),
+            },
             { kind: 'separator' },
             {
               kind: 'action',
