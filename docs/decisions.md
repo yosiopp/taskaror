@@ -50,6 +50,16 @@ taskaror の実装で採用した決めごとをまとめる。スケジュー�
   コアロジックを `@taskaror/core` に切り出して双方から参照する(npm workspaces)。
 - **compose.yaml の位置づけ** — `dev` / `web` プロファイルは開発・確認用の便宜として残し、
   `taskaror serve` を製品レベルの統一起動コマンドとする。
+- **PNG / PDF 出力はシステムのブラウザで変換する** — `png` / `pdf` コマンドは、
+  `svg` と同じ SVG を HTML に包み、インストール済みの Chrome / Chromium / Edge を
+  ヘッドレス起動(`--screenshot` / `--print-to-pdf`)して変換する。ランタイム依存
+  ゼロ方針を守るためで、ネイティブモジュール(resvg / sharp 等)や puppeteer は
+  採用しない(単一 CJS バンドルに同梱できず、依存ゼロが崩れるため)。探索順は
+  環境変数 `TASKAROR_CHROME` → 既知のインストール先 → PATH。Chrome は環境に
+  よって変換後もプロセスが終了しない(macOS の Chrome 150 で確認)ため、
+  「出力ファイルが現れてサイズが安定したこと」を成功条件とし、こちらから終了させる
+  ([packages/cli/src/chrome.ts](../packages/cli/src/chrome.ts))。ブラウザを
+  同梱しない Docker イメージでは `png` / `pdf` は使えない(ドキュメントに明記)。
 
 ## スケジュール導出
 

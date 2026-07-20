@@ -1,13 +1,9 @@
 // svg コマンド: spec ファイルからガントチャートを自己完結した SVG として出力する。
-// フェーズ 4 で実装済みのレイアウト計算を再利用し、web の SVG エクスポート
-// (App.tsx の buildGanttSvg)と同じ流れ
-// (scheduleTasks → flattenScheduled → computeGanttLayout → renderGanttSvg)を踏襲する。
+// SVG の組み立て(レイアウト計算 → 描画)は png / pdf と共通の ganttExport.ts が担う。
 import { writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
-import { computeGanttLayout, flattenScheduled } from '@taskaror/core/gantt'
-import { renderGanttSvg } from '@taskaror/core/ganttSvg'
-import { scheduleTasks } from '@taskaror/core/schedule'
 import type { Command } from '../cli'
+import { buildGanttSvg } from '../ganttExport'
 import { loadValidatedSpec } from '../specFile'
 
 /** svg の使い方(ヘルプ)の文面 */
@@ -65,17 +61,11 @@ function runSvg(argv: string[]): number {
   )
   if (spec === null) return 1
 
-  // スケジュール導出 → 全行の平坦化 → レイアウト計算 → SVG 描画(web と同じ流れ)。
   // レイアウト定数は core の既定値(web のガント表示と同じ値)をそのまま使う。
   // 「今日」(今日線・開始日の既定)は実行時のローカル日付を使う
   let svg: string
   try {
-    const rows = flattenScheduled(scheduleTasks(spec))
-    const layout = computeGanttLayout(rows)
-    svg = renderGanttSvg(
-      layout,
-      rows.map((row) => ({ id: row.scheduled.task.id, depth: row.depth })),
-    )
+    svg = buildGanttSvg(spec)
   } catch (err) {
     console.error(
       `${file}: SVG を生成できません(${err instanceof Error ? err.message : String(err)})`,

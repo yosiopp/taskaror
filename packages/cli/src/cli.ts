@@ -1,6 +1,7 @@
 // taskaror CLI のディスパッチ(コマンド振り分け・ヘルプ・バージョン表示)。
 // バージョンは package.json からビルド時(esbuild のバンドル)に焼き込まれる
 import packageJson from '../package.json'
+import { pdfCommand, pngCommand } from './commands/export'
 import { lintCommand } from './commands/lint'
 import { serveCommand } from './commands/serve'
 import { svgCommand } from './commands/svg'
@@ -20,6 +21,8 @@ const commands: Record<string, Command> = {
   validate: validateCommand,
   lint: lintCommand,
   svg: svgCommand,
+  png: pngCommand,
+  pdf: pdfCommand,
 }
 
 /** 使い方(ヘルプ)の文面を組み立てる */

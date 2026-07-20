@@ -1,6 +1,6 @@
 # CLI の使い方
 
-`taskaror` コマンドは、GUI エディタの配信(`serve`)と、spec ファイルを扱うサブコマンド(`validate` / `lint` / `svg`)を提供します。実行方法は npx と Docker の 2 通りです。
+`taskaror` コマンドは、GUI エディタの配信(`serve`)と、spec ファイルを扱うサブコマンド(`validate` / `lint` / `svg` / `png` / `pdf`)を提供します。実行方法は npx と Docker の 2 通りです。
 
 ```bash
 npx taskaror --help    # 使い方を表示(各サブコマンドは <command> --help)
@@ -43,6 +43,22 @@ npx taskaror svg task.taskspec.yaml -o gantt.svg    # ファイルへ(--output �
 
 GUI と同じレイアウト計算でガントチャートを SVG として出力します。
 
+## png / pdf — ガントチャート PNG / PDF の出力
+
+```bash
+npx taskaror png task.taskspec.yaml                 # task.png へ書き出す
+npx taskaror png task.taskspec.yaml -o gantt.png --scale 3
+npx taskaror pdf task.taskspec.yaml -o gantt.pdf
+```
+
+`svg` と同じレイアウトのガントチャートを PNG 画像 / PDF として出力します。`-o` を省略すると入力ファイルの拡張子を `.png` / `.pdf` に変えたパスへ書き出します。`--scale` は PNG の描画倍率(1〜4 の数値。既定は 2)です。PDF はチャート全体がぴったり収まる 1 ページとして出力されます。
+
+変換にはシステムにインストール済みの Chrome / Chromium / Edge をヘッドレス起動して使います。自動検出できない場合は、環境変数 `TASKAROR_CHROME` に実行ファイルのパスを指定してください。
+
+```bash
+TASKAROR_CHROME=/usr/bin/chromium npx taskaror png task.taskspec.yaml
+```
+
 ## 終了コード
 
 | コード | 意味                                                    |
@@ -79,3 +95,5 @@ docker run --rm -v $PWD:/work ghcr.io/yosiopp/taskaror validate task.taskspec.ya
 docker run --rm -v $PWD:/work ghcr.io/yosiopp/taskaror lint task.taskspec.yaml
 docker run --rm -v $PWD:/work ghcr.io/yosiopp/taskaror svg task.taskspec.yaml -o gantt.svg
 ```
+
+Docker イメージにはブラウザを同梱していないため、`png` / `pdf` は Docker では実行できません(npx で実行してください)。

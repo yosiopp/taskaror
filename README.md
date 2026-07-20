@@ -1,6 +1,6 @@
 # taskaror
 
-**taskaror** は、YAML ベースのタスク定義フォーマット **TaskSpec** を編集・検証・可視化するためのオープンソースプロジェクトです。ブラウザ上で動くガントチャートエディタを備え、GUI で編集した内容をリアルタイムにガントへ反映し、`.taskspec.yaml` として保存できます。あわせて、検証・lint・SVG 出力を行う CLI を提供します。
+**taskaror** は、YAML ベースのタスク定義フォーマット **TaskSpec** を編集・検証・可視化するためのオープンソースプロジェクトです。ブラウザ上で動くガントチャートエディタを備え、GUI で編集した内容をリアルタイムにガントへ反映し、`.taskspec.yaml` として保存できます。あわせて、検証・lint・SVG / PNG / PDF 出力を行う CLI を提供します。
 
 TaskSpec は、人・AI・Git が扱いやすいことを重視した、軽量な WBS（Work Breakdown Structure）・ガントチャート向けデータフォーマットです。taskaror はそのリファレンス実装およびツール群を提供します。
 
@@ -68,6 +68,8 @@ npx taskaror validate task.taskspec.yaml    # JSON Schema+構造の検証(複数
 npx taskaror lint task.taskspec.yaml        # スケジュール導出から見た矛盾・怪しい記述を検出
 npx taskaror svg task.taskspec.yaml                 # ガントチャート SVG を標準出力へ
 npx taskaror svg task.taskspec.yaml -o gantt.svg    # ファイルへ書き出し(--output でも可)
+npx taskaror png task.taskspec.yaml -o gantt.png    # PNG 出力(要 Chrome / Chromium / Edge)
+npx taskaror pdf task.taskspec.yaml -o gantt.pdf    # PDF 出力(要 Chrome / Chromium / Edge)
 
 # Docker では、カレントディレクトリを /work にマウントして渡す
 docker run --rm -v $PWD:/work ghcr.io/yosiopp/taskaror validate task.taskspec.yaml
