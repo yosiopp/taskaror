@@ -223,6 +223,27 @@ describe('computeGanttLayout: 期間と軸', () => {
     expect(layout.days.map((d) => d.isWeekend)).toEqual([true, false, false])
   })
 
+  it('タスク範囲外の holidays はレイアウトに影響しない(期間を広げず列も作らない)', () => {
+    const roots = scheduleTasks(
+      spec([{ id: 'a', title: 'A', start: '2026-07-13', estimate: '1d' }]),
+      { today: TODAY },
+    )
+    const rows = flattenScheduled(roots)
+    const options = {
+      dayWidth: 10,
+      rowHeight: 20,
+      today: TODAY,
+      paddingDays: 1,
+    }
+    // 範囲は 07-12 〜 07-14。その前後の平日を除外日にしても結果は同一
+    const plain = computeGanttLayout(rows, options)
+    const withOutside = computeGanttLayout(rows, {
+      ...options,
+      holidays: new Set(['2026-07-10', '2026-07-15']),
+    })
+    expect(withOutside).toEqual(plain)
+  })
+
   it('months は YYYY-MM でグルーピングし幅を日数 * dayWidth にする', () => {
     // 07-31(金)開始 1d を置くと余白込みで 07-30 〜 08-01 が範囲になり月をまたぐ
     const roots = scheduleTasks(
