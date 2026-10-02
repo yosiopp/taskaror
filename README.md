@@ -1,4 +1,10 @@
-# taskaror
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/site/docs/public/logo-dark.svg">
+    <img src="docs/site/docs/public/logo-light.svg" alt="" height="32" align="absmiddle">
+  </picture>
+  taskaror
+</h1>
 
 **taskaror** は、YAML ベースのタスク定義フォーマット **TaskSpec** を編集・検証・可視化するためのオープンソースプロジェクトです。ブラウザ上で動くガントチャートエディタを備え、GUI で編集した内容をリアルタイムにガントへ反映し、`.taskspec.yaml` として保存できます。あわせて、検証・lint・SVG / PNG / PDF 出力を行う CLI を提供します。
 
