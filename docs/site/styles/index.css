@@ -1,0 +1,22 @@
+/* ドキュメントサイトのグローバルスタイル(rspress.config.ts の globalStyles で読み込む)。 */
+
+/* トップページのヒーロー: タイトル文字(hero.name)の左に並べるアプリアイコン。
+   docs/index.md の hero.name に埋め込んだ <span class="hero-app-icon"> に適用する。
+   アイコンの図形をマスクにしてタイトルと同じグラデーションで塗るので、
+   文字サイズ(em)とテーマ(light / dark)にそのまま追従する。 */
+.hero-app-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  /* 図形は viewBox の内側に余白を持つ。左の余白を詰め、図形の下端を文字のベースラインに揃える */
+  margin: 0 -0.02em 0 -0.1em;
+  vertical-align: -0.15em;
+  background: var(--rp-home-hero-name-background);
+  /* タイトル全体(アイコン + 文字)に掛かるグラデーションの左端と色がつながるよう、
+     タイトルのおおよその大きさに引き伸ばして左端だけを見せる */
+  background-size: 5em 1.3em;
+  background-position: left center;
+  background-repeat: no-repeat;
+  -webkit-mask: url('../docs/public/logo-light.svg') center / contain no-repeat;
+  mask: url('../docs/public/logo-light.svg') center / contain no-repeat;
+}

@@ -54,9 +54,11 @@ YAML ビューで行う(専用 UI は将来検討)。
   ([packages/web/src/components/AppIcon.tsx](../packages/web/src/components/AppIcon.tsx))を
   表示する。インライン SVG を currentColor で描き、ライト / ダークの文字色に追従させる。
   ファビコン(web・ドキュメントサイト共通の favicon.svg)は単体で表示されるため、
-  SVG 内の `prefers-color-scheme` で色を切り替える。ドキュメントサイトのナビバーと
-  トップページのヒーロー画像は、テーマをサイト側のトグルで切り替えるので、色を固定した
-  logo-light.svg / logo-dark.svg を出し分ける。同じ図形を複数ファイルに持つため、アイコンを変えるときはすべて揃える。
+  SVG 内の `prefers-color-scheme` で色を切り替える。ドキュメントサイトのナビバーは
+  テーマをサイト側のトグルで切り替えるので、色を固定した logo-light.svg / logo-dark.svg を
+  出し分ける。トップページのヒーローでは、タイトル文字の左に同じ大きさで並べる
+  (hero.name に埋め込んだ span に、アイコンの図形をマスクとして当て、タイトルと同じ
+  グラデーションで塗る。スタイルは docs/site/styles/index.css)。同じ図形を複数ファイルに持つため、アイコンを変えるときはすべて揃える。
 - **アプリ情報の単一ソース** — アプリ名・GitHub リポジトリ URL は
   [packages/web/src/appInfo.ts](../packages/web/src/appInfo.ts)(`REPOSITORY_URL` =
   `https://github.com/yosiopp/taskaror`)を単一のソースとする。バージョンは

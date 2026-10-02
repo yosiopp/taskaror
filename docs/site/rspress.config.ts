@@ -24,6 +24,8 @@ export default defineConfig({
     dark: '/logo-dark.svg',
   },
   logoText: 'taskaror',
+  // トップページのヒーローでタイトル文字の左に並べるアプリアイコンのスタイル
+  globalStyles: path.join(dirname, 'styles/index.css'),
   description:
     'YAML ベースのタスク定義フォーマット TaskSpec のエディタ・ツール群',
   route: {
