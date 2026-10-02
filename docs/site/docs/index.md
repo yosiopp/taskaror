@@ -4,6 +4,11 @@ hero:
   name: taskaror
   text: TaskSpec エディタ・ツール群
   tagline: YAML ベースのタスク定義フォーマット TaskSpec を編集・検証・可視化するオープンソースプロジェクト
+  image:
+    src:
+      light: /logo-light.svg
+      dark: /logo-dark.svg
+    alt: taskaror
   actions:
     - theme: brand
       text: ブラウザで試す
