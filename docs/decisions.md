@@ -50,6 +50,13 @@ YAML ビューで行う(専用 UI は将来検討)。
   36^3 = 46,656 通りのため、衝突時は再生成でよい(連番化はしない)。
 - **アイコン** — Material Icons を使用し、自己完結性のためインライン SVG パスで
   埋め込む(Web フォント / CDN は使わない)。
+- **アプリアイコン** — ヘッダではアプリ名のテキストの代わりにアプリアイコン
+  ([packages/web/src/components/AppIcon.tsx](../packages/web/src/components/AppIcon.tsx))を
+  表示する。インライン SVG を currentColor で描き、ライト / ダークの文字色に追従させる。
+  ファビコン(web・ドキュメントサイト共通の favicon.svg)は単体で表示されるため、
+  SVG 内の `prefers-color-scheme` で色を切り替える。ドキュメントサイトのナビバーは
+  テーマをサイト側のトグルで切り替えるので、色を固定した logo-light.svg / logo-dark.svg を
+  出し分ける。同じ図形を複数ファイルに持つため、アイコンを変えるときはすべて揃える。
 - **アプリ情報の単一ソース** — アプリ名・GitHub リポジトリ URL は
   [packages/web/src/appInfo.ts](../packages/web/src/appInfo.ts)(`REPOSITORY_URL` =
   `https://github.com/yosiopp/taskaror`)を単一のソースとする。バージョンは

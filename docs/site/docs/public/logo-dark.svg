@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#e6edf3" stroke-width="7">
+  <title>taskaror</title>
+  <path d="M23 9V39.5c0 7.5 4 11.5 10.5 11.5c3 0 5-.4 7-1.2M11 23H48" stroke-linejoin="round"/>
+  <path d="M39 13l10 10-10 10"/>
+  <path d="M11 19.5C16 19 19 15.5 19.5 9H22V22H11z" fill="#e6edf3" stroke="none"/>
+</svg>

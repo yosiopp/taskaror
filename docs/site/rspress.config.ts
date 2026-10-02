@@ -17,6 +17,13 @@ export default defineConfig({
   title: 'taskaror',
   // web(GUI エディタ)と同じファビコン(docs/public/favicon.svg)
   icon: '/favicon.svg',
+  // ナビバーのロゴ。テーマ切替は OS 設定ではなくサイト側のトグルで決まるため、
+  // currentColor ではなく色を固定した light / dark の 2 枚を出し分ける
+  logo: {
+    light: '/logo-light.svg',
+    dark: '/logo-dark.svg',
+  },
+  logoText: 'taskaror',
   description:
     'YAML ベースのタスク定義フォーマット TaskSpec のエディタ・ツール群',
   route: {

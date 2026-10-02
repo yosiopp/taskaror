@@ -30,6 +30,10 @@ describe('App スモーク', () => {
     expect(html).toContain('<svg')
   })
 
+  it('ヘッダにアプリアイコンが描画される(アプリ名は読み上げ用ラベルで持つ)', () => {
+    expect(html).toContain('aria-label="taskaror"')
+  })
+
   it('ヘッダにメニューバー(ファイル/編集/表示)が描画される', () => {
     expect(html).toContain('ファイル')
     expect(html).toContain('編集')

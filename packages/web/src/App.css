@@ -77,9 +77,9 @@
   border-top: 1px solid var(--border);
 }
 
+/* アプリアイコン(AppIcon)。行が折り返しても縮まないようにする */
 .header-brand {
-  font-weight: 700;
-  font-size: 1.05rem;
+  flex: none;
   margin-right: 0.25rem;
 }
 

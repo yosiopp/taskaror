@@ -1,6 +1,6 @@
 /**
  * グローバルヘッダ(2 行構成)。
- * 1 行目: アプリ名 / プロジェクトタイトル / メニューバー([ファイル]・[編集]・[表示]・[ヘルプ])。
+ * 1 行目: アプリアイコン / プロジェクトタイトル / メニューバー([ファイル]・[編集]・[表示]・[ヘルプ])。
  * 2 行目: タスク操作のツールバー(Material Icons)。ガント編集ビューでのみ表示する。
  * ファイル・undo/redo・ビュー切替・クリティカルパスなどの操作はメニューに集約し、
  * ツールバーには重複させない。例外はフィルター:適用中かどうかを常に示すため、
@@ -13,6 +13,7 @@ import type { Menu } from './MenuBar'
 import type { FilterSection } from './FilterDialog'
 import { isColumnVisible, isDefaultColumnState } from './gridColumns'
 import type { GridColumnKey, GridColumnState } from './gridColumns'
+import { AppIcon } from './AppIcon'
 import { Icon } from './icons'
 import type { IconName } from './icons'
 import { DOCS_URL, REPOSITORY_URL } from '../appInfo'
@@ -376,7 +377,7 @@ function Toolbar(props: ToolbarProps) {
   return (
     <header className="app-header">
       <div className="header-row header-row-top">
-        <span className="header-brand">taskaror</span>
+        <AppIcon className="header-brand" />
         <input
           className="header-title"
           type="text"
